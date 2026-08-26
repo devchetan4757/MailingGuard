@@ -1,0 +1,61 @@
+# ==============================
+# General
+# ==============================
+
+.env
+.env.*
+!.env.example
+
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+*.swp
+*.swo
+
+
+# ==============================
+# Frontend
+# ==============================
+
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+
+# ==============================
+# Backend
+# ==============================
+
+backend/__pycache__/
+backend/**/*.pyc
+backend/.pytest_cache/
+
+# Virtual environment
+backend/venv/
+backend/.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+
+# ==============================
+# Generated / Local Data
+# ==============================
+
+*.db
+*.sqlite
+*.sqlite3
+
+uploads/
+reports/
+temp/
