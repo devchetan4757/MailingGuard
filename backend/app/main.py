@@ -1,9 +1,6 @@
-from fastapi import FastAPI
+from flask import Flask
 
-app = FastAPI(
-    title="API",
-    version="0.1.0"
-)
+app = Flask(__name__)
 
 
 @app.get("/")
