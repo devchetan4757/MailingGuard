@@ -1,1 +1,40 @@
 @import "tailwindcss";
+
+/* ------------------------------------------------------------------
+   Design tokens — "Chain of Custody" identity for the Security &
+   Integrity module. Not the default AI-generated palette on purpose:
+   ink-navy ground, brass for the seal chain's structure, verdigris for
+   verified, sealwax red for broken. See features/security-integrity
+   for where these get used.
+   ------------------------------------------------------------------ */
+@theme {
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-ink: #14171f;
+  --color-ink-raised: #1b202b;
+  --color-ink-panel: #1f2530;
+  --color-ink-line: #2b3240;
+
+  --color-parchment: #ede7d8;
+  --color-parchment-dim: #c9c2ae;
+
+  --color-brass: #c8a24c;
+  --color-brass-dim: #8a713a;
+
+  --color-verdigris: #4c8c6b;
+  --color-verdigris-dim: #2f5b45;
+
+  --color-sealwax: #b23b30;
+  --color-sealwax-dim: #7a2921;
+
+  --color-ink-text: #e9e4d6;
+  --color-muted: #8b92a3;
+}
+
+body {
+  background-color: var(--color-ink);
+  color: var(--color-ink-text);
+  font-family: var(--font-body);
+}

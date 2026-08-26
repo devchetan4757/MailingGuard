@@ -1,0 +1,1 @@
+"""MailingGuard FastAPI application package."""
