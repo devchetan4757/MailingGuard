@@ -1,3 +1,6 @@
+import re
+from urllib.parse import urlparse
+
 from email import policy
 from email.parser import BytesParser
 from email.header import decode_header, make_header
@@ -12,6 +15,31 @@ def decode_mime_header(value):
         return str(make_header(decode_header(value)))
     except (TypeError, ValueError):
         return str(value)
+
+
+def extract_urls(text):
+    """Extract unique HTTP/HTTPS URLs from text."""
+    if not text:
+        return []
+
+    matches = re.findall(r"https?://[^\s<>'\"]+", text)
+
+    urls = []
+
+    for url in matches:
+        url = url.rstrip(".,;:!?)]}")
+
+        try:
+            parsed = urlparse(url)
+
+            if parsed.scheme in ("http", "https") and parsed.netloc:
+                if url not in urls:
+                    urls.append(url)
+
+        except ValueError:
+            continue
+
+    return urls
 
 
 def parse_email(file_path):
@@ -83,6 +111,14 @@ def parse_email(file_path):
         elif content_type == "text/html":
             html_body = message.get_content()
 
+    urls = extract_urls(
+        "\n".join(
+            body
+            for body in (text_body, html_body)
+            if body
+        )
+    )
+
     return {
         "metadata": metadata,
         "body": {
@@ -90,4 +126,5 @@ def parse_email(file_path):
             "html": html_body,
         },
         "attachments": attachments,
+        "urls": urls,
     }
