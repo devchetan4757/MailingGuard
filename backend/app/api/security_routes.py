@@ -15,19 +15,35 @@ Endpoints:
   POST /api/security/demo/reset       -> wipe the ledger back to empty
 """
 
+import os
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, File, UploadFile
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from app.utils.file_validation import validate_upload
 from app.utils.sanitize import sanitize_for_display, contains_injection_attempt
-from app.services.hashchain import seal_case, verify_chain, get_last_hash
+from app.services.hashchain import seal_case, verify_chain
 from app.store import case_store
 
 
 router = APIRouter(prefix="/api/security", tags=["security-integrity"])
+
+# Demo-only routes (/demo/seed, /demo/tamper, /demo/reset) are destructive
+# and have NO authentication. They must never be reachable outside a local
+# demo/dev environment. Gated behind an explicit env var, defaulting ON for
+# local development — set DEMO_MODE=false (or unset it) before any real
+# deployment so these routes 404 instead of executing.
+DEMO_MODE = os.getenv("DEMO_MODE", "true").lower() == "true"
+
+
+def _require_demo_mode():
+    """Call at the top of every /demo/* route. Hides the route entirely
+    (404, not 403) when DEMO_MODE is off, so its existence isn't even
+    revealed to an unauthenticated caller."""
+    if not DEMO_MODE:
+        raise HTTPException(status_code=404, detail="Not found")
 
 
 class SanitizeRequest(BaseModel):
@@ -62,9 +78,10 @@ async def validate_email_upload(file: UploadFile = File(...)):
         "analyzedAt": datetime.now(timezone.utc).isoformat(),
     }
 
-    previous_hash = get_last_hash(case_store.all_cases())
-    sealed = seal_case(case_data, previous_hash)
-    case_store.append_case(sealed)
+    # Atomic: reads the last hash and appends the newly sealed case under
+    # one lock, so two near-simultaneous uploads can never chain onto the
+    # same previous hash (see case_store.seal_and_append docstring).
+    sealed = case_store.seal_and_append(lambda previous_hash: seal_case(case_data, previous_hash))
 
     return {"valid": True, "reason": None, "case": sealed}
 
@@ -94,6 +111,7 @@ def sanitize_preview(payload: SanitizeRequest):
 @router.post("/demo/seed")
 def seed_demo_data():
     """Populate the ledger with a few sample sealed cases for demo purposes."""
+    _require_demo_mode()
     samples = [
         {"filename": "invoice_review.eml", "subject": "Invoice #4471 overdue", "sender": "billing@vendor-co.com", "sizeBytes": 18320, "injectionFlagged": False},
         {"filename": "password_reset.eml", "subject": "Your account needs verification", "sender": "no-reply@secure-login-update.com", "sizeBytes": 24110, "injectionFlagged": True},
@@ -105,8 +123,7 @@ def seed_demo_data():
             "analyzedAt": datetime.now(timezone.utc).isoformat(),
             **sample,
         }
-        previous_hash = get_last_hash(case_store.all_cases())
-        case_store.append_case(seal_case(case_data, previous_hash))
+        case_store.seal_and_append(lambda previous_hash, cd=case_data: seal_case(cd, previous_hash))
 
     return {"cases": case_store.all_cases()}
 
@@ -114,6 +131,7 @@ def seed_demo_data():
 @router.post("/demo/tamper")
 def tamper_demo_case(payload: TamperRequest):
     """Deliberately corrupt a stored case without resealing it, to prove verify-chain catches it."""
+    _require_demo_mode()
     found = case_store.tamper_with_case(payload.caseId, payload.newRiskScore)
     return {"tampered": found}
 
@@ -121,5 +139,6 @@ def tamper_demo_case(payload: TamperRequest):
 @router.post("/demo/reset")
 def reset_ledger():
     """Wipe the ledger back to empty."""
+    _require_demo_mode()
     case_store.clear()
     return {"cases": []}
