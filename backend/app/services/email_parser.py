@@ -1,3 +1,4 @@
+import os
 import re
 from urllib.parse import urlparse
 
@@ -40,6 +41,48 @@ def extract_urls(text):
             continue
 
     return urls
+
+
+def analyze_attachment(filename, content_type):
+    """Return basic security signals for an email attachment."""
+    extension = os.path.splitext(filename or "")[1].lower()
+
+    suspicious_extensions = {
+        ".exe",
+        ".dll",
+        ".scr",
+        ".com",
+        ".bat",
+        ".cmd",
+        ".ps1",
+        ".vbs",
+        ".js",
+        ".jse",
+        ".wsf",
+        ".wsh",
+        ".msi",
+        ".jar",
+    }
+
+    if extension in suspicious_extensions:
+        return {
+            "extension": extension,
+            "suspicious": True,
+            "reason": "Executable or script file",
+        }
+
+    if extension in {".zip", ".rar", ".7z"}:
+        return {
+            "extension": extension,
+            "suspicious": True,
+            "reason": "Archive file requires further inspection",
+        }
+
+    return {
+        "extension": extension,
+        "suspicious": False,
+        "reason": None,
+    }
 
 
 def parse_email(file_path):
@@ -87,11 +130,18 @@ def parse_email(file_path):
             if disposition == "attachment" or filename:
                 payload = part.get_payload(decode=True) or b""
 
+                decoded_filename = decode_mime_header(filename)
+                attachment_analysis = analyze_attachment(
+                    decoded_filename,
+                    content_type,
+                )
+
                 attachments.append(
                     {
-                        "filename": decode_mime_header(filename),
+                        "filename": decoded_filename,
                         "content_type": content_type,
                         "size": len(payload),
+                        **attachment_analysis,
                     }
                 )
                 continue
