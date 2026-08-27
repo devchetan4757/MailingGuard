@@ -13,7 +13,12 @@ replace with a real datastore before this goes anywhere near production.
 """
 
 from threading import Lock
-from typing import List
+from typing import Callable, List
+
+# Must match hashchain.GENESIS_HASH exactly — kept as a separate constant
+# here (rather than imported) so case_store has zero dependency on the
+# hashchain module's internals, per this file's framework-agnostic design.
+GENESIS_HASH = "0" * 64
 
 _lock = Lock()
 _ledger: List[dict] = []
@@ -29,6 +34,25 @@ def append_case(sealed_case: dict) -> None:
     """Add a newly sealed case to the end of the ledger."""
     with _lock:
         _ledger.append(sealed_case)
+
+
+def seal_and_append(seal_fn: Callable[[str], dict]) -> dict:
+    """
+    Atomically read the current last hash, seal a new case against it, and
+    append it — all under one lock, so two near-simultaneous requests can
+    never read the same 'last hash' and both chain onto it.
+
+    seal_fn: a function that takes the current last hash (str) and returns
+             the freshly sealed case dict (e.g. lambda h: seal_case(data, h)).
+             It must NOT touch case_store itself — just build the sealed dict.
+
+    Returns the sealed case that was appended.
+    """
+    with _lock:
+        last_hash = _ledger[-1].get("caseHash") if _ledger else GENESIS_HASH
+        sealed = seal_fn(last_hash)
+        _ledger.append(sealed)
+        return sealed
 
 
 def clear() -> None:
