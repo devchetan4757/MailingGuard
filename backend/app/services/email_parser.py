@@ -33,6 +33,14 @@ def parse_email(file_path):
         "date": decode_mime_header(message.get("Date")),
         "reply_to": decode_mime_header(message.get("Reply-To")),
         "message_id": decode_mime_header(message.get("Message-ID")),
+        "return_path": decode_mime_header(message.get("Return-Path")),
+        "authentication_results": decode_mime_header(
+            message.get("Authentication-Results")
+        ),
+        "received_spf": decode_mime_header(message.get("Received-SPF")),
+        "dkim_signature": decode_mime_header(message.get("DKIM-Signature")),
+        "x_mailer": decode_mime_header(message.get("X-Mailer")),
+        "x_originating_ip": decode_mime_header(message.get("X-Originating-IP")),
     }
 
     text_body = None
