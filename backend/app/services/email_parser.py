@@ -177,6 +177,11 @@ def parse_email(file_path):
         "x_originating_ip": decode_mime_header(message.get("X-Originating-IP")),
     }
 
+    received_chain = [
+        decode_mime_header(value)
+        for value in message.get_all("Received", [])
+    ]
+
     text_body = None
     html_body = None
     attachments = []
@@ -243,5 +248,6 @@ def parse_email(file_path):
         "attachments": attachments,
         "urls": urls,
         "header_findings": header_findings,
+        "received_chain": received_chain,
     }
 
