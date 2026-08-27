@@ -85,6 +85,69 @@ def analyze_attachment(filename, content_type):
     }
 
 
+def extract_email_address(value):
+    """Extract the email address portion from a header value."""
+    if not value:
+        return None
+
+    match = re.search(r"<([^<>@\s]+@[^<>@\s]+)>", value)
+
+    if match:
+        return match.group(1)
+
+    match = re.search(r"\b([^@\s<>]+@[^@\s<>]+)\b", value)
+
+    if match:
+        return match.group(1)
+
+    return None
+
+
+def analyze_header_relationships(metadata):
+    """Identify potentially suspicious relationships between email headers."""
+    findings = []
+
+    from_value = metadata.get("from")
+    reply_to = metadata.get("reply_to")
+    return_path = metadata.get("return_path")
+
+    if from_value and reply_to:
+        from_address = extract_email_address(from_value)
+        reply_to_address = extract_email_address(reply_to)
+
+        if (
+            from_address
+            and reply_to_address
+            and from_address.lower() != reply_to_address.lower()
+        ):
+            findings.append(
+                {
+                    "type": "reply_to_mismatch",
+                    "severity": "medium",
+                    "message": "Reply-To address differs from the From address.",
+                }
+            )
+
+    if from_value and return_path:
+        from_address = extract_email_address(from_value)
+        return_path_address = extract_email_address(return_path)
+
+        if (
+            from_address
+            and return_path_address
+            and from_address.lower() != return_path_address.lower()
+        ):
+            findings.append(
+                {
+                    "type": "return_path_mismatch",
+                    "severity": "low",
+                    "message": "Return-Path address differs from the From address.",
+                }
+            )
+
+    return findings
+
+
 def parse_email(file_path):
     """
     Parse an .eml file and return its structured contents.
@@ -169,6 +232,8 @@ def parse_email(file_path):
         )
     )
 
+    header_findings = analyze_header_relationships(metadata)
+
     return {
         "metadata": metadata,
         "body": {
@@ -177,4 +242,6 @@ def parse_email(file_path):
         },
         "attachments": attachments,
         "urls": urls,
+        "header_findings": header_findings,
     }
+
