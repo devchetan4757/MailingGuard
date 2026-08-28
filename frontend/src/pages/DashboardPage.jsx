@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useCases } from "../hooks/useCases";
-import { useAnalyzeEmail } from "../hooks/useAnalyzeEmail";
 import { useGmailOverview } from "../hooks/useGmailOverview";
 import { useCaseContext } from "../context/CaseContext";
 
@@ -37,65 +36,46 @@ function getDailyBreakdown(cases) {
       const date = new Date(now);
 
       date.setDate(
-        now.getDate() -
-          (days - 1 - index)
+        now.getDate() - (days - 1 - index)
       );
 
-      const dayCases = cases.filter(
-        (item) => {
-          if (!item?.analyzedAt) {
-            return false;
-          }
+      const dayCases = cases.filter((item) => {
+        if (!item?.analyzedAt) return false;
 
-          const analyzed =
-            new Date(item.analyzedAt);
+        const analyzed = new Date(item.analyzedAt);
 
-          return (
-            analyzed.getDate() ===
-              date.getDate() &&
-            analyzed.getMonth() ===
-              date.getMonth() &&
-            analyzed.getFullYear() ===
-              date.getFullYear()
-          );
-        }
-      );
-
-      const red = dayCases.filter(
-        (c) =>
-          c?.severity === "red"
-      ).length;
-
-      const yellow = dayCases.filter(
-        (c) =>
-          c?.severity === "yellow"
-      ).length;
-
-      const green = dayCases.filter(
-        (c) =>
-          c?.severity === "green"
-      ).length;
-
-      const reviewed = dayCases.filter(
-        (c) =>
-          c?.reviewed === true
-      ).length;
-
-      const pending = dayCases.filter(
-        (c) =>
-          c?.reviewed !== true
-      ).length;
+        return (
+          analyzed.getDate() === date.getDate() &&
+          analyzed.getMonth() === date.getMonth() &&
+          analyzed.getFullYear() === date.getFullYear()
+        );
+      });
 
       return {
         label: date.toLocaleDateString(
           [],
           { weekday: "short" }
         ),
-        red,
-        yellow,
-        green,
-        reviewed,
-        pending,
+
+        red: dayCases.filter(
+          (c) => c?.severity === "red"
+        ).length,
+
+        yellow: dayCases.filter(
+          (c) => c?.severity === "yellow"
+        ).length,
+
+        green: dayCases.filter(
+          (c) => c?.severity === "green"
+        ).length,
+
+        reviewed: dayCases.filter(
+          (c) => c?.reviewed === true
+        ).length,
+
+        pending: dayCases.filter(
+          (c) => c?.reviewed !== true
+        ).length,
       };
     }
   );
@@ -112,37 +92,42 @@ function getChartData(cases) {
       const date = new Date(now);
 
       date.setDate(
-        now.getDate() -
-          (days - 1 - index)
+        now.getDate() - (days - 1 - index)
       );
 
-      const total = cases.filter(
-        (item) => {
-          if (!item?.analyzedAt) {
-            return false;
-          }
+      const dayCases = cases.filter((item) => {
+        if (!item?.analyzedAt) return false;
 
-          const analyzed =
-            new Date(item.analyzedAt);
+        const analyzed = new Date(item.analyzedAt);
 
-          return (
-            analyzed.getDate() ===
-              date.getDate() &&
-            analyzed.getMonth() ===
-              date.getMonth() &&
-            analyzed.getFullYear() ===
-              date.getFullYear()
-          );
-        }
-      ).length;
+        return (
+          analyzed.getDate() === date.getDate() &&
+          analyzed.getMonth() === date.getMonth() &&
+          analyzed.getFullYear() === date.getFullYear()
+        );
+      });
 
       return {
         date,
+
         label: date.toLocaleDateString(
           [],
           { weekday: "short" }
         ),
-        total,
+
+        total: dayCases.length,
+
+        red: dayCases.filter(
+          (item) => item?.severity === "red"
+        ).length,
+
+        yellow: dayCases.filter(
+          (item) => item?.severity === "yellow"
+        ).length,
+
+        green: dayCases.filter(
+          (item) => item?.severity === "green"
+        ).length,
       };
     }
   );
@@ -151,10 +136,6 @@ function getChartData(cases) {
 
 /* =========================================================
    GMAIL MERGE HELPERS
-
-   These fold mailbox data into the SAME widgets the case
-   data already feeds (Top Sender Domains, Alert Volume,
-   stat row) instead of standing up a parallel Gmail section.
    ========================================================= */
 
 function mergeTopDomains(
@@ -196,6 +177,7 @@ function getMailboxActivityByWeekday(
     if (!item?.date) return;
 
     const date = new Date(item.date);
+
     if (Number.isNaN(date.getTime())) return;
 
     const label = date.toLocaleDateString(
@@ -246,31 +228,38 @@ function getAuthBreakdown(cases) {
   let ranChecks = 0;
 
   cases.forEach((item) => {
-    const hc =
-      item?.headerChecks || {};
+    const checks =
+      item?.headerChecks ||
+      item?.dashboard?.authentication ||
+      {};
 
-    AUTH_PROTOCOLS.forEach(
-      (key) => {
-        const value = hc[key];
+    AUTH_PROTOCOLS.forEach((key) => {
+      let value = checks[key];
 
-        if (
-          value !== "pass" &&
-          value !== "fail"
-        ) {
-          return;
-        }
-
-        totals[key].total += 1;
-        ranChecks += 1;
-
-        if (value === "pass") {
-          totals[key].pass += 1;
-          passChecks += 1;
-        } else {
-          totals[key].fail += 1;
-        }
+      if (
+        typeof checks[key] === "object" &&
+        checks[key] !== null
+      ) {
+        value = checks[key].result;
       }
-    );
+
+      if (
+        value !== "pass" &&
+        value !== "fail"
+      ) {
+        return;
+      }
+
+      totals[key].total += 1;
+      ranChecks += 1;
+
+      if (value === "pass") {
+        totals[key].pass += 1;
+        passChecks += 1;
+      } else {
+        totals[key].fail += 1;
+      }
+    });
   });
 
   const passRate = ranChecks
@@ -297,28 +286,20 @@ function getHighlightTrend(cases) {
       const date = new Date(now);
 
       date.setDate(
-        now.getDate() -
-          (days - 1 - index)
+        now.getDate() - (days - 1 - index)
       );
 
-      const dayCases =
-        cases.filter((item) => {
-          if (!item?.analyzedAt) {
-            return false;
-          }
+      const dayCases = cases.filter((item) => {
+        if (!item?.analyzedAt) return false;
 
-          const analyzed =
-            new Date(item.analyzedAt);
+        const analyzed = new Date(item.analyzedAt);
 
-          return (
-            analyzed.getDate() ===
-              date.getDate() &&
-            analyzed.getMonth() ===
-              date.getMonth() &&
-            analyzed.getFullYear() ===
-              date.getFullYear()
-          );
-        });
+        return (
+          analyzed.getDate() === date.getDate() &&
+          analyzed.getMonth() === date.getMonth() &&
+          analyzed.getFullYear() === date.getFullYear()
+        );
+      });
 
       let high = 0;
       let medium = 0;
@@ -326,12 +307,23 @@ function getHighlightTrend(cases) {
 
       dayCases.forEach((item) => {
         (
-          item?.highlights || []
-        ).forEach((h) => {
-          if (h?.level === "high") {
+          item?.highlights ||
+          item?.dashboard?.findings ||
+          []
+        ).forEach((finding) => {
+          const level =
+            finding?.level ||
+            finding?.severity ||
+            "medium";
+
+          if (
+            level === "high" ||
+            level === "red"
+          ) {
             high += 1;
           } else if (
-            h?.level === "low"
+            level === "low" ||
+            level === "green"
           ) {
             low += 1;
           } else {
@@ -345,6 +337,7 @@ function getHighlightTrend(cases) {
           [],
           { weekday: "short" }
         ),
+
         high,
         medium,
         low,
@@ -360,6 +353,8 @@ function extractDomain(item) {
     item?.parsedEmail?.from ||
     item?.sender ||
     item?.from ||
+    item?.analysis?.metadata?.from ||
+    item?.analysis?.from ||
     "";
 
   const match =
@@ -374,10 +369,7 @@ function extractDomain(item) {
   return domain
     ? domain
         .toLowerCase()
-        .replace(
-          /[<>]/g,
-          ""
-        )
+        .replace(/[<>]/g, "")
     : null;
 }
 
@@ -389,8 +381,7 @@ function getTopSenderDomains(
   const counts = new Map();
 
   cases.forEach((item) => {
-    const domain =
-      extractDomain(item);
+    const domain = extractDomain(item);
 
     if (!domain) return;
 
@@ -400,19 +391,336 @@ function getTopSenderDomains(
     );
   });
 
-  return [
-    ...counts.entries(),
-  ]
-    .sort(
-      (a, b) => b[1] - a[1]
-    )
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
     .slice(0, limit)
-    .map(
-      ([domain, count]) => ({
-        domain,
-        count,
-      })
+    .map(([domain, count]) => ({
+      domain,
+      count,
+    }));
+}
+
+
+/* =========================================================
+   REAL ANALYZER AGGREGATION
+   ========================================================= */
+
+function getAnalyzerDashboard(cases) {
+  const analyzedCases = cases.filter(
+    (item) =>
+      item?.dashboard ||
+      item?.analysis
+  );
+
+  const empty = {
+    metrics: {
+      urlCount: 0,
+      suspiciousUrlCount: 0,
+      attachmentCount: 0,
+      suspiciousAttachmentCount: 0,
+      headerFindingCount: 0,
+      receivedHopCount: 0,
+      authenticationFailureCount: 0,
+      totalFindingCount: 0,
+    },
+
+    authentication: [
+      {
+        name: "SPF",
+        result: "none",
+        status: "unknown",
+        value: 0,
+      },
+      {
+        name: "DKIM",
+        result: "none",
+        status: "unknown",
+        value: 0,
+      },
+      {
+        name: "DMARC",
+        result: "none",
+        status: "unknown",
+        value: 0,
+      },
+    ],
+
+    threatCategories: [],
+    findingSeverity: [],
+    contentRisk: [],
+    findings: [],
+  };
+
+  if (!analyzedCases.length) {
+    return empty;
+  }
+
+  const metrics = {
+    ...empty.metrics,
+  };
+
+  const auth = {
+    spf: {
+      pass: 0,
+      fail: 0,
+      none: 0,
+    },
+
+    dkim: {
+      pass: 0,
+      fail: 0,
+      none: 0,
+    },
+
+    dmarc: {
+      pass: 0,
+      fail: 0,
+      none: 0,
+    },
+  };
+
+  const categories = new Map();
+
+  const severities = {
+    low: 0,
+    medium: 0,
+    high: 0,
+  };
+
+  const content = {
+    URLs: {
+      total: 0,
+      suspicious: 0,
+    },
+
+    Attachments: {
+      total: 0,
+      suspicious: 0,
+    },
+
+    "Header Findings": {
+      total: 0,
+      suspicious: 0,
+    },
+  };
+
+  const findings = [];
+
+  analyzedCases.forEach((item) => {
+    const dashboard =
+      item?.dashboard || {};
+
+    const itemMetrics =
+      dashboard?.metrics || {};
+
+    metrics.urlCount += Number(
+      itemMetrics.urlCount ||
+      dashboard?.contentRisk?.find(
+        (x) => x?.name === "URLs"
+      )?.total ||
+      item?.analysis?.urls?.length ||
+      0
     );
+
+    metrics.suspiciousUrlCount += Number(
+      itemMetrics.suspiciousUrlCount ||
+      dashboard?.contentRisk?.find(
+        (x) => x?.name === "URLs"
+      )?.suspicious ||
+      0
+    );
+
+    metrics.attachmentCount += Number(
+      itemMetrics.attachmentCount ||
+      dashboard?.contentRisk?.find(
+        (x) => x?.name === "Attachments"
+      )?.total ||
+      item?.analysis?.attachments?.length ||
+      0
+    );
+
+    metrics.suspiciousAttachmentCount += Number(
+      itemMetrics.suspiciousAttachmentCount ||
+      dashboard?.contentRisk?.find(
+        (x) => x?.name === "Attachments"
+      )?.suspicious ||
+      0
+    );
+
+    metrics.headerFindingCount += Number(
+      itemMetrics.headerFindingCount ||
+      dashboard?.contentRisk?.find(
+        (x) => x?.name === "Header Findings"
+      )?.total ||
+      item?.analysis?.header_findings?.length ||
+      0
+    );
+
+    metrics.receivedHopCount += Number(
+      itemMetrics.receivedHopCount ||
+      item?.analysis?.received_chain?.length ||
+      0
+    );
+
+    metrics.authenticationFailureCount += Number(
+      itemMetrics.authenticationFailureCount ||
+      0
+    );
+
+    metrics.totalFindingCount += Number(
+      itemMetrics.totalFindingCount ||
+      dashboard?.findings?.length ||
+      0
+    );
+
+    AUTH_PROTOCOLS.forEach((protocol) => {
+      const result =
+        item?.headerChecks?.[protocol] ||
+        item?.analysis?.authentication?.[protocol]?.result ||
+        "none";
+
+      if (
+        auth[protocol][result] !== undefined
+      ) {
+        auth[protocol][result] += 1;
+      } else {
+        auth[protocol].none += 1;
+      }
+    });
+
+    (
+      dashboard?.threatCategories ||
+      []
+    ).forEach((entry) => {
+      const key =
+        entry?.name || "Other";
+
+      categories.set(
+        key,
+        (categories.get(key) || 0) +
+          Number(entry?.value || 0)
+      );
+    });
+
+    (
+      dashboard?.findingSeverity ||
+      []
+    ).forEach((entry) => {
+      const name =
+        String(
+          entry?.name || ""
+        ).toLowerCase();
+
+      if (
+        name === "high" ||
+        name === "critical"
+      ) {
+        severities.high += Number(
+          entry?.value || 0
+        );
+      } else if (
+        name === "medium" ||
+        name === "moderate"
+      ) {
+        severities.medium += Number(
+          entry?.value || 0
+        );
+      } else {
+        severities.low += Number(
+          entry?.value || 0
+        );
+      }
+    });
+
+    (
+      dashboard?.findings ||
+      item?.analysis?.header_findings ||
+      []
+    ).forEach((finding) => {
+      findings.push({
+        ...finding,
+        caseId: item?.caseId,
+      });
+    });
+  });
+
+  content.URLs.total =
+    metrics.urlCount;
+
+  content.URLs.suspicious =
+    metrics.suspiciousUrlCount;
+
+  content.Attachments.total =
+    metrics.attachmentCount;
+
+  content.Attachments.suspicious =
+    metrics.suspiciousAttachmentCount;
+
+  content["Header Findings"].total =
+    metrics.headerFindingCount;
+
+  content["Header Findings"].suspicious =
+    metrics.headerFindingCount;
+
+  return {
+    metrics,
+
+    authentication:
+      AUTH_PROTOCOLS.map((protocol) => ({
+        name: protocol.toUpperCase(),
+
+        result:
+          auth[protocol].fail > 0
+            ? "fail"
+            : auth[protocol].pass > 0
+              ? "pass"
+              : "none",
+
+        status:
+          auth[protocol].fail > 0
+            ? "fail"
+            : auth[protocol].pass > 0
+              ? "pass"
+              : "unknown",
+
+        value:
+          auth[protocol].pass,
+      })),
+
+    threatCategories:
+      [...categories.entries()]
+        .map(([name, value]) => ({
+          name,
+          value,
+        }))
+        .sort(
+          (a, b) => b.value - a.value
+        ),
+
+    findingSeverity: [
+      {
+        name: "High",
+        value: severities.high,
+      },
+      {
+        name: "Medium",
+        value: severities.medium,
+      },
+      {
+        name: "Low",
+        value: severities.low,
+      },
+    ],
+
+    contentRisk:
+      Object.entries(content)
+        .map(([name, value]) => ({
+          name,
+          ...value,
+        })),
+
+    findings,
+  };
 }
 
 
@@ -436,12 +744,6 @@ export default function DashboardPage() {
   } = useCases();
 
   const {
-    analyze,
-    isLoading: isAnalyzing,
-    error: analyzeError,
-  } = useAnalyzeEmail();
-
-  const {
     status: gmailStatus,
     dashboard: gmailDashboard,
     connected: gmailConnected,
@@ -450,25 +752,6 @@ export default function DashboardPage() {
     error: gmailError,
     sync: syncGmailNow,
   } = useGmailOverview();
-
-
-  /* =======================================================
-     ANALYZE EMAIL
-     ======================================================= */
-
-  async function handleFileSelected(
-    file
-  ) {
-    const result =
-      await analyze(file).catch(
-        () => null
-      );
-
-    if (result) {
-      setCurrentCase(result);
-      refetch();
-    }
-  }
 
 
   /* =======================================================
@@ -482,27 +765,57 @@ export default function DashboardPage() {
     : [];
 
 
+  /*
+   * The freshly analyzed case can contain the complete dashboard
+   * response before the case-list endpoint has refreshed.
+   *
+   * Include it immediately so the dashboard reacts to analysis
+   * without waiting for another page load.
+   */
+
+  const dashboardCases = useMemo(() => {
+    if (!currentCase?.caseId) {
+      return cases;
+    }
+
+    const exists = cases.some(
+      (item) =>
+        item?.caseId ===
+        currentCase.caseId
+    );
+
+    return exists
+      ? cases
+      : [
+          ...cases,
+          currentCase,
+        ];
+  }, [
+    cases,
+    currentCase,
+  ]);
+
+
   /* =======================================================
-     GMAIL MERGE DATA (computed first so CHART DATA below
-     can fold it straight into the existing widgets)
+     GMAIL
      ======================================================= */
 
   const mailboxStats =
     gmailDashboard?.stats || {};
 
-  // Weekday -> mailbox email count, used only as a fallback
-  // series for the Alert Volume chart when there's no case
-  // activity yet, so that chart shows real numbers instead
-  // of a placeholder.
-  const mailboxActivityByWeekday = useMemo(
-    () =>
-      getMailboxActivityByWeekday(
-        gmailConnected
-          ? gmailDashboard?.activity
-          : []
-      ),
-    [gmailConnected, gmailDashboard]
-  );
+  const mailboxActivityByWeekday =
+    useMemo(
+      () =>
+        getMailboxActivityByWeekday(
+          gmailConnected
+            ? gmailDashboard?.activity
+            : []
+        ),
+      [
+        gmailConnected,
+        gmailDashboard,
+      ]
+    );
 
 
   /* =======================================================
@@ -511,43 +824,59 @@ export default function DashboardPage() {
 
   const chartData = useMemo(
     () =>
-      getChartData(cases).map((day) => ({
+      getChartData(
+        dashboardCases
+      ).map((day) => ({
         ...day,
+
         mailboxTotal:
           mailboxActivityByWeekday.get(
             day.label
           ) || 0,
       })),
-    [cases, mailboxActivityByWeekday]
+    [
+      dashboardCases,
+      mailboxActivityByWeekday,
+    ]
   );
+
 
   const breakdownData = useMemo(
     () =>
-      getDailyBreakdown(cases),
-    [cases]
+      getDailyBreakdown(
+        dashboardCases
+      ),
+    [dashboardCases]
   );
+
 
   const authBreakdown = useMemo(
     () =>
-      getAuthBreakdown(cases),
-    [cases]
+      getAuthBreakdown(
+        dashboardCases
+      ),
+    [dashboardCases]
   );
+
 
   const highlightTrend = useMemo(
     () =>
-      getHighlightTrend(cases),
-    [cases]
+      getHighlightTrend(
+        dashboardCases
+      ),
+    [dashboardCases]
   );
+
 
   const caseTopDomains = useMemo(
     () =>
-      getTopSenderDomains(cases),
-    [cases]
+      getTopSenderDomains(
+        dashboardCases
+      ),
+    [dashboardCases]
   );
 
-  // Fold Gmail's own top-domain counts into the SAME
-  // "Top Sender Domains" list the cases already populate,
-  // rather than rendering a second list for mailbox data.
+
   const topDomains = useMemo(
     () =>
       mergeTopDomains(
@@ -565,23 +894,38 @@ export default function DashboardPage() {
 
 
   /* =======================================================
+     REAL ANALYZER DATA
+     ======================================================= */
+
+  const analyzerDashboard = useMemo(
+    () =>
+      getAnalyzerDashboard(
+        dashboardCases
+      ),
+    [dashboardCases]
+  );
+
+
+  /* =======================================================
      STATISTICS
      ======================================================= */
 
   const totalFlags =
-    cases.reduce(
+    analyzerDashboard.metrics
+      .totalFindingCount ||
+    dashboardCases.reduce(
       (sum, item) =>
         sum +
         (
-          item?.highlights
-            ?.length || 0
+          item?.highlights?.length ||
+          0
         ),
       0
     );
 
 
   const todayCount =
-    cases.filter(
+    dashboardCases.filter(
       (item) =>
         isToday(
           item?.analyzedAt
@@ -590,7 +934,7 @@ export default function DashboardPage() {
 
 
   const highRiskCount =
-    cases.filter(
+    dashboardCases.filter(
       (item) =>
         item?.severity === "red" ||
         Number(
@@ -600,23 +944,24 @@ export default function DashboardPage() {
 
 
   const reviewedCount =
-    cases.filter(
+    dashboardCases.filter(
       (item) =>
         item?.reviewed === true
     ).length;
 
 
   const averageScore =
-    cases.length
+    dashboardCases.length
       ? Math.round(
-          cases.reduce(
+          dashboardCases.reduce(
             (sum, item) =>
               sum +
               Number(
                 item?.riskScore || 0
               ),
             0
-          ) / cases.length
+          ) /
+            dashboardCases.length
         )
       : 0;
 
@@ -624,50 +969,64 @@ export default function DashboardPage() {
   const totalAlerts =
     chartData.reduce(
       (sum, item) =>
-        sum +
-        item.total,
+        sum + item.total,
       0
     );
 
 
   /* =======================================================
-     GMAIL MERGE — fold mailbox numbers into the SAME stat
-     cards instead of a separate stat row. Case data always
-     wins when it exists; mailbox numbers only fill in the
-     gaps (and annotate the delta) when it doesn't.
+     GMAIL MERGE
      ======================================================= */
 
-  const mailboxToday = gmailConnected
-    ? Number(mailboxStats.today || 0)
-    : 0;
+  const mailboxToday =
+    gmailConnected
+      ? Number(
+          mailboxStats.today || 0
+        )
+      : 0;
 
-  const mailboxThisWeek = gmailConnected
-    ? Number(mailboxStats.thisWeek || 0)
-    : 0;
+  const mailboxThisWeek =
+    gmailConnected
+      ? Number(
+          mailboxStats.thisWeek || 0
+        )
+      : 0;
 
-  const mailboxTotalFetched = gmailConnected
-    ? Number(mailboxStats.totalFetched || 0)
-    : 0;
+  const mailboxTotalFetched =
+    gmailConnected
+      ? Number(
+          mailboxStats.totalFetched || 0
+        )
+      : 0;
 
-  const mailboxUnread = gmailConnected
-    ? Number(mailboxStats.unread || 0)
-    : 0;
+  const mailboxUnread =
+    gmailConnected
+      ? Number(
+          mailboxStats.unread || 0
+        )
+      : 0;
 
   const mergedTodayCount =
-    todayCount || totalAlerts || mailboxToday;
+    todayCount ||
+    totalAlerts ||
+    mailboxToday;
 
   const mergedReviewedCount =
     reviewedCount ||
-    cases.length ||
+    dashboardCases.length ||
     mailboxTotalFetched;
 
-  const todayDelta = !todayCount && gmailConnected
-    ? `${mailboxThisWeek} mailbox this wk`
-    : null;
+  const todayDelta =
+    !todayCount &&
+    gmailConnected
+      ? `${mailboxThisWeek} mailbox this wk`
+      : null;
 
-  const reviewedDelta = !reviewedCount && gmailConnected
-    ? `${mailboxUnread} unread`
-    : null;
+  const reviewedDelta =
+    !reviewedCount &&
+    gmailConnected
+      ? `${mailboxUnread} unread`
+      : null;
 
 
   /* =======================================================
@@ -675,7 +1034,7 @@ export default function DashboardPage() {
      ======================================================= */
 
   const recentCases = [
-    ...cases,
+    ...dashboardCases,
   ]
     .sort(
       (a, b) =>
@@ -733,26 +1092,13 @@ export default function DashboardPage() {
       <div className="reference-shell">
 
         <DashboardSections
-          currentCase={currentCase}
-          setCurrentCase={
-            setCurrentCase
+          navigate={
+            navigate
           }
 
-          handleFileSelected={
-            handleFileSelected
+          cases={
+            dashboardCases
           }
-
-          isAnalyzing={
-            isAnalyzing
-          }
-
-          analyzeError={
-            analyzeError
-          }
-
-          navigate={navigate}
-
-          cases={cases}
 
           chartData={
             chartData
@@ -782,7 +1128,9 @@ export default function DashboardPage() {
             mergedTodayCount
           }
 
-          todayDelta={todayDelta}
+          todayDelta={
+            todayDelta
+          }
 
           highRiskCount={
             highRiskCount
@@ -792,7 +1140,9 @@ export default function DashboardPage() {
             mergedReviewedCount
           }
 
-          reviewedDelta={reviewedDelta}
+          reviewedDelta={
+            reviewedDelta
+          }
 
           averageScore={
             averageScore
@@ -802,12 +1152,34 @@ export default function DashboardPage() {
             totalAlerts
           }
 
-          gmailStatus={gmailStatus}
-          gmailConnected={gmailConnected}
-          gmailSyncing={gmailSyncing}
-          gmailLoadProgress={gmailLoadProgress}
-          gmailError={gmailError}
-          onSyncGmail={syncGmailNow}
+          /* New real analyzer information */
+          analyzerDashboard={
+            analyzerDashboard
+          }
+
+          gmailStatus={
+            gmailStatus
+          }
+
+          gmailConnected={
+            gmailConnected
+          }
+
+          gmailSyncing={
+            gmailSyncing
+          }
+
+          gmailLoadProgress={
+            gmailLoadProgress
+          }
+
+          gmailError={
+            gmailError
+          }
+
+          onSyncGmail={
+            syncGmailNow
+          }
 
           recentCases={
             recentCases

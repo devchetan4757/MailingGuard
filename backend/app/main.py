@@ -1,41 +1,142 @@
 """
-App entrypoint — integrator owned.
+MailGuard FastAPI application.
 
-Keep this file thin: CORS setup + mounting the api_router. Feature logic
-belongs in services/, endpoint definitions belong in api/.
+Entry point for the MailGuard backend.
+
+Run from the backend directory with:
+
+    uvicorn app.main:app --reload
 """
+
+from __future__ import annotations
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.core.config import settings
-from app.api import api_router
+from app.api.analyze import router as analyze_router
+from app.api.cases import router as cases_router
+from app.api.report import router as report_router
+from app.api.integrations.gmail import router as gmail_router
+
+
+# ---------------------------------------------------------------------------
+# APPLICATION
+# ---------------------------------------------------------------------------
 
 app = FastAPI(
-    title=settings.PROJECT_NAME,
-    version=settings.VERSION,
+    title="MailGuard API",
+    description=(
+        "Email security analysis backend for MailGuard."
+    ),
+    version="1.0.0",
 )
+
+
+# ---------------------------------------------------------------------------
+# CORS
+# ---------------------------------------------------------------------------
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_methods=["*"],
-    allow_headers=["*"],
+
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
+
+    allow_credentials=True,
+
+    allow_methods=[
+        "*",
+    ],
+
+    allow_headers=[
+        "*",
+    ],
 )
 
-app.include_router(api_router)
 
+# ---------------------------------------------------------------------------
+# ANALYSIS API
+# ---------------------------------------------------------------------------
+
+app.include_router(
+    analyze_router,
+    prefix="/api",
+    tags=[
+        "Email Analysis",
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# CASES / HISTORY API
+# ---------------------------------------------------------------------------
+
+app.include_router(
+    cases_router,
+    prefix="/api",
+    tags=[
+        "Cases",
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# REPORTING API
+# ---------------------------------------------------------------------------
+
+app.include_router(
+    report_router,
+    prefix="/api",
+    tags=[
+        "Reporting",
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# GMAIL INTEGRATION API
+# ---------------------------------------------------------------------------
+
+app.include_router(
+    gmail_router,
+    prefix="/api",
+    tags=[
+        "Gmail Integration",
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# HEALTH / STATUS
+# ---------------------------------------------------------------------------
 
 @app.get("/")
-def root():
+async def root():
     return {
-        "project": "MailingGuard",
-        "status": "running",
+        "name": "MailGuard API",
+        "status": "online",
+        "version": "1.0.0",
     }
 
 
 @app.get("/health")
-def health():
+async def health():
     return {
-        "status": "ok",
+        "status": "healthy",
+        "service": "mailguard",
+        "analyzer": "enabled",
+    }
+
+
+@app.get("/api/health")
+async def api_health():
+    return {
+        "status": "healthy",
+        "service": "mailguard",
+        "analyzer": "enabled",
     }

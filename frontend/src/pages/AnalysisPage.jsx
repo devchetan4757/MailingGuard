@@ -1,8 +1,8 @@
 // src/pages/AnalysisPage.jsx
 /**
- * Second interface. Upload already happens on the Dashboard, so this page
- * has no upload box and no case list — it's a single-email AI deep-dive
- * for whatever case is currently loaded in CaseContext.
+ * Second interface. Upload/parsing lives on its own "Upload & Parse" page,
+ * so this page has no upload box and no case list — it's a single-email AI
+ * deep-dive for whatever case is currently loaded in CaseContext.
  */
 
 import { useNavigate } from "react-router-dom";
@@ -23,6 +23,7 @@ import {
 import { useCaseContext } from "../context/CaseContext";
 import { DashboardPanel, RiskGauge } from "../components/dashboard/DashboardWidgets";
 import AiBadge from "../components/dashboard/AiBadge";
+import EmailParsingPanel from "../components/dashboard/EmailParsingPanel";
 import { getCaseReportUrl } from "../api/casesApi";
 
 const CHECK_META = {
@@ -98,11 +99,12 @@ export default function AnalysisPage() {
             <BrainCircuit size={30} strokeWidth={1.6} />
             <h3>No email analyzed yet</h3>
             <p>
-              Upload an email from the dashboard to get a full AI breakdown here —
-              authentication checks, origin trace, and every signal we found.
+              Upload an email on the Upload &amp; Parse page to get a full AI
+              breakdown here — authentication checks, origin trace, and every
+              signal we found.
             </p>
-            <button type="button" className="ref-empty-cta" onClick={() => navigate("/")}>
-              Go to Dashboard
+            <button type="button" className="ref-empty-cta" onClick={() => navigate("/upload")}>
+              Go to Upload &amp; Parse
               <ArrowRight size={16} />
             </button>
           </section>
@@ -194,6 +196,8 @@ export default function AnalysisPage() {
             </div>
           </DashboardPanel>
         </div>
+
+        <EmailParsingPanel currentCase={currentCase} />
 
         <DashboardPanel title="AI signals" right={<AiBadge label={`${signals.length} found`} />}>
           <ul className="ref-signal-list">

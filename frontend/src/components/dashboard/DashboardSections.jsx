@@ -14,7 +14,6 @@ import {
 import {
   DashboardPanel,
   DashboardStat,
-  UploadEmailCard,
   RiskGauge,
   AlertVolumeChart,
   BreakdownChart,
@@ -24,18 +23,10 @@ import {
   TopSenderDomains,
 } from "./DashboardWidgets";
 
-import EmailParsingPanel from "./EmailParsingPanel";
 import DashboardAlertQueue from "./DashboardAlertQueue";
 
 
 export default function DashboardSections({
-  currentCase,
-  setCurrentCase,
-
-  handleFileSelected,
-  isAnalyzing,
-  analyzeError,
-
   navigate,
 
   cases,
@@ -164,32 +155,6 @@ export default function DashboardSections({
           Gmail: {gmailError}
         </p>
       )}
-
-
-      {/* =================================================
-          EMAIL UPLOAD / ANALYSIS
-          ================================================= */}
-
-      <UploadEmailCard
-        onFileSelected={handleFileSelected}
-        isLoading={isAnalyzing}
-      />
-
-      {analyzeError && (
-        <p className="ref-history-note">
-          Couldn't analyze that email:{" "}
-          {analyzeError}
-        </p>
-      )}
-
-
-      {/* =================================================
-          CURRENT EMAIL PARSING
-          ================================================= */}
-
-      <EmailParsingPanel
-        currentCase={currentCase}
-      />
 
 
       {/* =================================================

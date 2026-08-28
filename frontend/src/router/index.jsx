@@ -1,5 +1,6 @@
 import { Routes, Route } from "react-router-dom";
 import DashboardPage from "../pages/DashboardPage";
+import UploadPage from "../pages/UploadPage";
 import AnalysisPage from "../pages/AnalysisPage";
 import OriginAnalysisPage from "../pages/OriginAnalysisPage";
 import ReportsPage from "../pages/ReportsPage";
@@ -12,6 +13,11 @@ export default function AppRoutes() {
       <Route
         path="/"
         element={<DashboardPage />}
+      />
+
+      <Route
+        path="/upload"
+        element={<UploadPage />}
       />
 
       <Route
