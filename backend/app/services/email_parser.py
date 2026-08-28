@@ -148,6 +148,31 @@ def analyze_header_relationships(metadata):
     return findings
 
 
+def extract_authentication_result(authentication_results, received_spf):
+    """Extract and normalize the SPF authentication result."""
+    if authentication_results:
+        match = re.search(
+            r"\bspf=(pass|fail|softfail|neutral|none|temperror|permerror)\b",
+            authentication_results,
+            re.IGNORECASE,
+        )
+
+        if match:
+            return match.group(1).lower()
+
+    if received_spf:
+        match = re.match(
+            r"\s*(pass|fail|softfail|neutral|none|temperror|permerror)\b",
+            received_spf,
+            re.IGNORECASE,
+        )
+
+        if match:
+            return match.group(1).lower()
+
+    return "unknown"
+
+
 def parse_email(file_path):
     """
     Parse an .eml file and return its structured contents.
@@ -181,6 +206,13 @@ def parse_email(file_path):
         decode_mime_header(value)
         for value in message.get_all("Received", [])
     ]
+
+    authentication = {
+        "spf": extract_authentication_result(
+            metadata.get("authentication_results"),
+            metadata.get("received_spf"),
+        )
+    }
 
     text_body = None
     html_body = None
@@ -249,5 +281,6 @@ def parse_email(file_path):
         "urls": urls,
         "header_findings": header_findings,
         "received_chain": received_chain,
+        "authentication": authentication,
     }
 
