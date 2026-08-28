@@ -34,7 +34,7 @@ frontend/.vite/
 # ==============================
 # Backend
 # ==============================
-
+backend/data
 backend/__pycache__/
 backend/**/*.pyc
 backend/.pytest_cache/
@@ -59,3 +59,7 @@ __pycache__/
 uploads/
 reports/
 temp/
+
+
+#zips
+mailguard.zip

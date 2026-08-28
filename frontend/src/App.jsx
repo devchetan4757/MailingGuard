@@ -1,16 +1,28 @@
+// src/App.jsx
+
+import { BrowserRouter } from "react-router-dom";
+import Sidebar from "./components/layout/SideBar";
+import TopBar from "./components/layout/TopBar";
+import AppRoutes from "./router";
+import { CaseProvider } from "./context/CaseContext";
+
 function App() {
   return (
-    <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold">
-          MailingGuard
-        </h1>
+    <BrowserRouter>
+      <CaseProvider>
+        <div className="reference-app-shell">
+          <TopBar />
 
-        <p className="mt-3 text-slate-400">
-          Use Tailwind (for AI)
-        </p>
-      </div>
-    </main>
+          <div className="reference-body">
+            <Sidebar />
+
+            <div className="reference-content">
+              <AppRoutes />
+            </div>
+          </div>
+        </div>
+      </CaseProvider>
+    </BrowserRouter>
   );
 }
 
