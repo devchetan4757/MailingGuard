@@ -173,6 +173,79 @@ def extract_authentication_result(authentication_results, received_spf):
     return "unknown"
 
 
+
+def extract_dkim_result(authentication_results):
+    """Extract and normalize the DKIM authentication result."""
+    if not authentication_results:
+        return "unknown"
+
+    match = re.search(
+        r"\bdkim=(pass|fail|neutral|none|temperror|permerror)\b",
+        authentication_results,
+        re.IGNORECASE,
+    )
+
+    if match:
+        return match.group(1).lower()
+
+    return "unknown"
+
+
+def extract_dmarc_result(authentication_results):
+    """Extract and normalize the DMARC authentication result."""
+    if not authentication_results:
+        return "unknown"
+
+    match = re.search(
+        r"\bdmarc=(pass|fail|neutral|none|temperror|permerror)\b",
+        authentication_results,
+        re.IGNORECASE,
+    )
+
+    if match:
+        return match.group(1).lower()
+
+    return "unknown"
+
+
+def authentication_explanation(authentication_type, result):
+    """Return a plain-language explanation for an authentication result."""
+    explanations = {
+        "spf": {
+            "pass": "The sending server was authorized to send email for this domain.",
+            "fail": "The sending server was not authorized to send email for this domain.",
+            "softfail": "The sending server was probably not authorized to send email for this domain.",
+            "neutral": "The domain did not make a clear SPF authorization statement.",
+            "none": "No SPF record was found for this domain.",
+            "temperror": "A temporary error occurred while checking SPF.",
+            "permerror": "A permanent error occurred while checking SPF.",
+            "unknown": "No SPF authentication result was found.",
+        },
+        "dkim": {
+            "pass": "The email's DKIM signature was successfully verified.",
+            "fail": "The email's DKIM signature could not be verified.",
+            "neutral": "The DKIM check did not produce a definitive result.",
+            "none": "No DKIM signature was found.",
+            "temperror": "A temporary error occurred while checking DKIM.",
+            "permerror": "A permanent error occurred while checking DKIM.",
+            "unknown": "No DKIM authentication result was found.",
+        },
+        "dmarc": {
+            "pass": "The email passed DMARC authentication.",
+            "fail": "The email failed DMARC authentication.",
+            "neutral": "The DMARC check did not produce a definitive result.",
+            "none": "No DMARC authentication result was found.",
+            "temperror": "A temporary error occurred while checking DMARC.",
+            "permerror": "A permanent error occurred while checking DMARC.",
+            "unknown": "No DMARC authentication result was found.",
+        },
+    }
+
+    return explanations.get(authentication_type, {}).get(
+        result,
+        "No explanation is available for this authentication result.",
+    )
+
 def parse_email(file_path):
     """
     Parse an .eml file and return its structured contents.
@@ -207,11 +280,30 @@ def parse_email(file_path):
         for value in message.get_all("Received", [])
     ]
 
+    authentication_results = metadata.get("authentication_results")
+    received_spf = metadata.get("received_spf")
+
+    spf_result = extract_authentication_result(
+        authentication_results,
+        received_spf,
+    )
+
+    dkim_result = extract_dkim_result(authentication_results)
+    dmarc_result = extract_dmarc_result(authentication_results)
+
     authentication = {
-        "spf": extract_authentication_result(
-            metadata.get("authentication_results"),
-            metadata.get("received_spf"),
-        )
+        "spf": {
+            "result": spf_result,
+            "explanation": authentication_explanation("spf", spf_result),
+        },
+        "dkim": {
+            "result": dkim_result,
+            "explanation": authentication_explanation("dkim", dkim_result),
+        },
+        "dmarc": {
+            "result": dmarc_result,
+            "explanation": authentication_explanation("dmarc", dmarc_result),
+        },
     }
 
     text_body = None
