@@ -1,0 +1,222 @@
+/* src/styles/layout.css */
+/* Styles for the app shell, sidebar, and topbar. */
+/* Palette matches the existing upload button/card (teal accent). */
+/* Sidebar + topbar sized up for more breathing room. */
+
+:root {
+  --layout-bg: #EEF5F5;
+  --layout-surface: #FFFFFF;
+  --layout-sidebar-bg: #F1F8F8;
+  --layout-border: #D6E4E5;
+
+  --layout-text-primary: #26363B;
+  --layout-text-secondary: #6C797E;
+
+  --layout-accent: #55AEB5;
+  --layout-accent-soft: #E3F1F2;
+  --layout-accent-hover: #429DA5;
+}
+
+.reference-app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+
+  background: var(--layout-bg);
+  color: var(--layout-text-primary);
+}
+
+.reference-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.reference-content {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+
+/* =========================================================
+   TOPBAR
+   ========================================================= */
+
+.reference-topbar {
+  height: 78px;
+  flex: 0 0 78px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+
+  padding: 0 32px;
+
+  background: var(--layout-surface);
+  border-bottom: 1px solid var(--layout-border);
+}
+
+.reference-topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.reference-logo {
+  width: 40px;
+  height: 40px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+
+  border-radius: 11px;
+  background: var(--layout-accent);
+  box-shadow: 0 5px 14px rgba(78, 155, 162, 0.30);
+}
+
+.reference-logo span {
+  width: 4px;
+  height: 15px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.reference-logo span:nth-child(2) {
+  height: 22px;
+}
+
+.reference-logo span:nth-child(3) {
+  height: 10px;
+}
+
+.reference-product-title {
+  color: var(--layout-text-primary);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.reference-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.reference-top-date {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  padding: 0 6px;
+
+  color: var(--layout-text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.reference-top-date button {
+  width: 30px;
+  height: 30px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 0;
+  border-radius: 8px;
+
+  background: transparent;
+  color: var(--layout-text-secondary);
+  cursor: pointer;
+
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.reference-top-date button:hover {
+  background: var(--layout-accent-soft);
+  color: var(--layout-accent-hover);
+}
+
+.reference-help {
+  width: 40px;
+  height: 40px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid var(--layout-border);
+  border-radius: 10px;
+
+  background: var(--layout-accent-soft);
+  color: var(--layout-accent-hover);
+  cursor: pointer;
+
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.reference-help:hover {
+  background: #D3ECEE;
+  border-color: #BEDEE0;
+}
+
+
+/* =========================================================
+   SIDEBAR
+   ========================================================= */
+
+.reference-sidebar {
+  width: 88px;
+  flex: 0 0 88px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  padding: 26px 0;
+
+  background: var(--layout-sidebar-bg);
+  border-right: 1px solid var(--layout-border);
+}
+
+.reference-side-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.reference-side-link {
+  width: 52px;
+  height: 52px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 14px;
+
+  color: var(--layout-text-secondary);
+  text-decoration: none;
+
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.reference-side-link svg {
+  width: 24px;
+  height: 24px;
+}
+
+.reference-side-link:hover {
+  background: var(--layout-accent-soft);
+  color: var(--layout-accent-hover);
+}
+
+.reference-side-link.is-active {
+  background: var(--layout-accent);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(78, 155, 162, 0.35);
+}

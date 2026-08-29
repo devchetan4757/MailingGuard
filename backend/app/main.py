@@ -1,70 +1,142 @@
-import os
-import tempfile
+"""
+MailGuard FastAPI application.
 
-from flask import Flask, jsonify, request
+Entry point for the MailGuard backend.
 
-from app.services.email_parser import parse_email
+Run from the backend directory with:
+
+    uvicorn app.main:app --reload
+"""
+
+from __future__ import annotations
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.api.analyze import router as analyze_router
+from app.api.cases import router as cases_router
+from app.api.report import router as report_router
+from app.api.integrations.gmail import router as gmail_router
 
 
-app = Flask(__name__)
+# ---------------------------------------------------------------------------
+# APPLICATION
+# ---------------------------------------------------------------------------
 
+app = FastAPI(
+    title="MailGuard API",
+    description=(
+        "Email security analysis backend for MailGuard."
+    ),
+    version="1.0.0",
+)
+
+
+# ---------------------------------------------------------------------------
+# CORS
+# ---------------------------------------------------------------------------
+
+app.add_middleware(
+    CORSMiddleware,
+
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
+
+    allow_credentials=True,
+
+    allow_methods=[
+        "*",
+    ],
+
+    allow_headers=[
+        "*",
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# ANALYSIS API
+# ---------------------------------------------------------------------------
+
+app.include_router(
+    analyze_router,
+    prefix="/api",
+    tags=[
+        "Email Analysis",
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# CASES / HISTORY API
+# ---------------------------------------------------------------------------
+
+app.include_router(
+    cases_router,
+    prefix="/api",
+    tags=[
+        "Cases",
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# REPORTING API
+# ---------------------------------------------------------------------------
+
+app.include_router(
+    report_router,
+    prefix="/api",
+    tags=[
+        "Reporting",
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# GMAIL INTEGRATION API
+# ---------------------------------------------------------------------------
+
+app.include_router(
+    gmail_router,
+    prefix="/api",
+    tags=[
+        "Gmail Integration",
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# HEALTH / STATUS
+# ---------------------------------------------------------------------------
 
 @app.get("/")
-def root():
+async def root():
     return {
-        "project": "MailingGuard",
-        "status": "running"
+        "name": "MailGuard API",
+        "status": "online",
+        "version": "1.0.0",
     }
 
 
 @app.get("/health")
-def health():
+async def health():
     return {
-        "status": "ok"
+        "status": "healthy",
+        "service": "mailguard",
+        "analyzer": "enabled",
     }
 
 
-@app.post("/api/parse-email")
-def parse_uploaded_email():
-    if "file" not in request.files:
-        return jsonify({
-            "error": "No file provided"
-        }), 400
-
-    uploaded_file = request.files["file"]
-
-    if not uploaded_file.filename:
-        return jsonify({
-            "error": "No file selected"
-        }), 400
-
-    if not uploaded_file.filename.lower().endswith(".eml"):
-        return jsonify({
-            "error": "Only .eml files are supported"
-        }), 400
-
-    temp_path = None
-
-    try:
-        with tempfile.NamedTemporaryFile(
-            suffix=".eml",
-            delete=False
-        ) as temp_file:
-            uploaded_file.save(temp_file)
-            temp_path = temp_file.name
-
-        parsed_email = parse_email(temp_path)
-
-        return jsonify({
-            "status": "success",
-            "email": parsed_email
-        })
-
-    except Exception:
-        return jsonify({
-            "error": "Unable to parse email file"
-        }), 400
-
-    finally:
-        if temp_path and os.path.exists(temp_path):
-            os.remove(temp_path)
+@app.get("/api/health")
+async def api_health():
+    return {
+        "status": "healthy",
+        "service": "mailguard",
+        "analyzer": "enabled",
+    }

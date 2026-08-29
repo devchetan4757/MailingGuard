@@ -1,0 +1,41 @@
+/* src/styles/tokens.css */
+
+:root {
+  /* Background — deep signal-void navy, tuned for a threat-ops command center */
+  --color-bg-canvas: #070A13;
+  --color-bg-surface: #0D1220;
+  --color-bg-elevated: #131A2D;
+
+  /* Borders */
+  --color-border-subtle: #1E2740;
+  --color-border-strong: #2B3555;
+
+  /* Text */
+  --color-text-primary: #EAEEF9;
+  --color-text-secondary: #8791AD;
+  --color-text-muted: #525C7A;
+
+  /* Brand / UI accent — electric cyan, the "detection pulse" */
+  --color-accent: #2FE0FF;
+  --color-accent-hover: #7CEEFF;
+  --color-accent-muted: #155E75;
+
+  /* Risk */
+  --color-risk-high: #FF4D6D;
+  --color-risk-medium: #FFB020;
+  --color-risk-low: #2EE6A8;
+
+  /* Charts */
+  --color-chart-primary: #2FE0FF;
+  --color-chart-secondary: #8B6FFF;
+  --color-chart-tertiary: #4C8DFF;
+  --color-chart-grid: #1E2740;
+
+  /* Positive / negative */
+  --color-success: #2EE6A8;
+  --color-danger: #FF4D6D;
+  --color-warning: #FFB020;
+
+  /* AI signature accent — reserved for AI-generated insight moments */
+  --color-ai-violet: #8B6FFF;
+}
