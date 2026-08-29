@@ -18,13 +18,13 @@ import {
   CheckCircle2,
   XCircle,
   AlertTriangle,
-  MapPin,
   X,
 } from "lucide-react";
 
 import { useCaseContext } from "../context/CaseContext";
 import { DashboardPanel, RiskGauge } from "../components/dashboard/DashboardWidgets";
 import { getCaseReportUrl } from "../api/casesApi";
+import TraceMap from "../components/results/TraceMap";
 
 const CHECK_META = {
   spf: {
@@ -146,18 +146,7 @@ export default function ResultsPage() {
           </DashboardPanel>
 
           <DashboardPanel title="Origin">
-            <div className="ref-origin-map">
-              <div className="ref-origin-map-pin">
-                <MapPin size={20} />
-              </div>
-              <strong>{origin.ip || "Unknown IP"}</strong>
-              <span>{origin.city ? `${origin.city}, ${origin.country}` : "Location unavailable"}</span>
-              {origin.isVpnOrHosting && (
-                <span className="ref-origin-flag" style={{ marginTop: 8 }}>
-                  Hosting / VPN
-                </span>
-              )}
-            </div>
+            <TraceMap origin={origin} compact />
           </DashboardPanel>
         </div>
 

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useCases } from "../hooks/useCases";
@@ -12,11 +12,11 @@ import DashboardSections from "../components/dashboard/DashboardSections";
    HELPERS
    ========================================================= */
 
-function isToday(value) {
+function isSameDay(value, referenceDate) {
   if (!value) return false;
 
   const date = new Date(value);
-  const now = new Date();
+  const now = referenceDate || new Date();
 
   return (
     date.getDate() === now.getDate() &&
@@ -26,9 +26,16 @@ function isToday(value) {
 }
 
 
-function getDailyBreakdown(cases) {
+function startOfDay(value) {
+  const date = new Date(value);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+
+function getDailyBreakdown(cases, referenceDate) {
   const days = 7;
-  const now = new Date();
+  const now = referenceDate || new Date();
 
   return Array.from(
     { length: days },
@@ -82,9 +89,9 @@ function getDailyBreakdown(cases) {
 }
 
 
-function getChartData(cases) {
+function getChartData(cases, referenceDate) {
   const days = 7;
-  const now = new Date();
+  const now = referenceDate || new Date();
 
   return Array.from(
     { length: days },
@@ -276,9 +283,9 @@ function getAuthBreakdown(cases) {
 }
 
 
-function getHighlightTrend(cases) {
+function getHighlightTrend(cases, referenceDate) {
   const days = 7;
-  const now = new Date();
+  const now = referenceDate || new Date();
 
   return Array.from(
     { length: days },
@@ -755,6 +762,47 @@ export default function DashboardPage() {
 
 
   /* =======================================================
+     SELECTED DATE
+     ======================================================= */
+
+  const [selectedDate, setSelectedDate] = useState(
+    () => startOfDay(new Date())
+  );
+
+  const isViewingToday = isSameDay(
+    selectedDate,
+    new Date()
+  );
+
+  const goToPreviousDay = useCallback(() => {
+    setSelectedDate((current) => {
+      const next = new Date(current);
+      next.setDate(current.getDate() - 1);
+      return next;
+    });
+  }, []);
+
+  const goToNextDay = useCallback(() => {
+    setSelectedDate((current) => {
+      if (isSameDay(current, new Date())) {
+        return current;
+      }
+
+      const next = new Date(current);
+      next.setDate(current.getDate() + 1);
+      return next;
+    });
+  }, []);
+
+  const selectedDateLabel = isViewingToday
+    ? "Today"
+    : selectedDate.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+
+
+  /* =======================================================
      CASE DATA
      ======================================================= */
 
@@ -825,7 +873,8 @@ export default function DashboardPage() {
   const chartData = useMemo(
     () =>
       getChartData(
-        dashboardCases
+        dashboardCases,
+        selectedDate
       ).map((day) => ({
         ...day,
 
@@ -837,6 +886,7 @@ export default function DashboardPage() {
     [
       dashboardCases,
       mailboxActivityByWeekday,
+      selectedDate,
     ]
   );
 
@@ -844,9 +894,10 @@ export default function DashboardPage() {
   const breakdownData = useMemo(
     () =>
       getDailyBreakdown(
-        dashboardCases
+        dashboardCases,
+        selectedDate
       ),
-    [dashboardCases]
+    [dashboardCases, selectedDate]
   );
 
 
@@ -862,9 +913,10 @@ export default function DashboardPage() {
   const highlightTrend = useMemo(
     () =>
       getHighlightTrend(
-        dashboardCases
+        dashboardCases,
+        selectedDate
       ),
-    [dashboardCases]
+    [dashboardCases, selectedDate]
   );
 
 
@@ -927,8 +979,9 @@ export default function DashboardPage() {
   const todayCount =
     dashboardCases.filter(
       (item) =>
-        isToday(
-          item?.analyzedAt
+        isSameDay(
+          item?.analyzedAt,
+          selectedDate
         )
     ).length;
 
@@ -1098,6 +1151,22 @@ export default function DashboardPage() {
 
           cases={
             dashboardCases
+          }
+
+          selectedDateLabel={
+            selectedDateLabel
+          }
+
+          onPrevDate={
+            goToPreviousDay
+          }
+
+          onNextDate={
+            goToNextDay
+          }
+
+          isNextDateDisabled={
+            isViewingToday
           }
 
           chartData={

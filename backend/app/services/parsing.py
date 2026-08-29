@@ -20,6 +20,7 @@ dashboard.
 
 from __future__ import annotations
 
+import ipaddress
 import re
 import tempfile
 import os
@@ -78,6 +79,30 @@ _PRIVATE_IP_PREFIXES = (
 )
 
 
+def _is_private_or_reserved(ip_str: str) -> bool:
+    """
+    True IP-range check (covers 172.16.0.0/12, link-local, CGNAT,
+    documentation ranges, etc.) rather than a handful of string prefixes -
+    those miss most of 172.16.0.0/12 (only "172.16." was ever matched, so
+    172.17.x through 172.31.x - the rest of that entire private block -
+    were being treated as public and could be reported as the origin).
+    """
+
+    try:
+        address = ipaddress.ip_address(ip_str)
+    except ValueError:
+        return True
+
+    return (
+        address.is_private
+        or address.is_loopback
+        or address.is_link_local
+        or address.is_reserved
+        or address.is_multicast
+        or not address.is_global
+    )
+
+
 def _copy_shape() -> dict:
     """
     Create a fresh result without sharing mutable lists between calls.
@@ -125,18 +150,26 @@ def _first_public_ip(
     received_chain,
 ):
     """
-    Find the first non-private IPv4 address in the earliest-first
-    Received chain.
+    Find the first non-private IPv4 address in the Received chain,
+    searching from the oldest hop to the newest.
+
+    Each relay prepends its own Received header, so `received_chain` (as
+    built from message.get_all("Received", ...)) is newest-hop-first /
+    oldest-hop-last - the reverse of the order we want to search in. The
+    hop closest to the true origin is the last one added by the actual
+    sending server, i.e. the *last* item in this list, so we walk it
+    backwards rather than take the first public IP we see (which would
+    just be the recipient's own inbound mail relay).
     """
 
-    for hop in received_chain or []:
+    for hop in reversed(received_chain or []):
 
         for candidate in _IP_RE.findall(
             str(hop)
         ):
 
-            if not candidate.startswith(
-                _PRIVATE_IP_PREFIXES
+            if not _is_private_or_reserved(
+                candidate
             ):
                 return candidate
 

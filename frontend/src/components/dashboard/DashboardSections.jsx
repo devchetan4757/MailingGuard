@@ -7,8 +7,6 @@ import {
   CircleHelp,
   Mail,
   RefreshCw,
-  UploadCloud,
-  ArrowUpRight,
   ShieldCheck,
   Users,
 } from "lucide-react";
@@ -48,6 +46,11 @@ export default function DashboardSections({
   totalAlerts,
   recentCases,
 
+  selectedDateLabel,
+  onPrevDate,
+  onNextDate,
+  isNextDateDisabled,
+
   gmailStatus,
   gmailConnected,
   gmailSyncing,
@@ -82,18 +85,21 @@ export default function DashboardSections({
             type="button"
             className="ref-icon-button"
             aria-label="Previous date"
+            onClick={onPrevDate}
           >
             <ChevronLeft size={17} />
           </button>
 
           <span className="ref-date-top">
-            Sept 30
+            {selectedDateLabel}
           </span>
 
           <button
             type="button"
             className="ref-icon-button"
             aria-label="Next date"
+            onClick={onNextDate}
+            disabled={isNextDateDisabled}
           >
             <ChevronRight size={17} />
           </button>
@@ -157,44 +163,6 @@ export default function DashboardSections({
           Gmail: {gmailError}
         </p>
       )}
-
-      {/* =================================================
-          DASHBOARD UPLOAD SHORTCUT
-          ================================================= */}
-
-      <section
-        className="ref-dashboard-upload"
-        role="button"
-        tabIndex={0}
-        onClick={() => navigate("/upload")}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            navigate("/upload");
-          }
-        }}
-        aria-label="Go to Upload and Parse"
-      >
-        <div className="ref-dashboard-upload-main">
-          <div className="ref-dashboard-upload-icon">
-            <UploadCloud size={21} strokeWidth={1.9} />
-          </div>
-
-          <div>
-            <span className="ref-dashboard-upload-eyebrow">EMAIL THREAT ANALYZER</span>
-            <h2>Upload an email for analysis</h2>
-            <p>
-              Open the upload workspace to inspect an .eml file, parse its headers,
-              links, attachments and authentication signals.
-            </p>
-          </div>
-        </div>
-
-        <div className="ref-dashboard-upload-action">
-          <span>Upload &amp; Parse</span>
-          <ArrowUpRight size={17} />
-        </div>
-      </section>
 
       {/* =================================================
           GMAIL LIVE LOAD STATUS
@@ -362,15 +330,6 @@ export default function DashboardSections({
 
         <DashboardPanel
           title="Breakdown"
-          right={
-            <button
-              type="button"
-              className="ref-week"
-            >
-              Week
-              <ChevronDown size={13} />
-            </button>
-          }
         >
           <BreakdownChart
             variant="one"
@@ -389,15 +348,6 @@ export default function DashboardSections({
 
         <DashboardPanel
           title="Breakdown"
-          right={
-            <button
-              type="button"
-              className="ref-week"
-            >
-              Week
-              <ChevronDown size={13} />
-            </button>
-          }
         >
           <BreakdownChart
             variant="two"
@@ -408,15 +358,6 @@ export default function DashboardSections({
 
         <DashboardPanel
           title="Verdict Trend"
-          right={
-            <button
-              type="button"
-              className="ref-week"
-            >
-              Week
-              <ChevronDown size={13} />
-            </button>
-          }
         >
           <OperationsChart
             data={breakdownData}

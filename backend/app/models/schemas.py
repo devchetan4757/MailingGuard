@@ -31,6 +31,8 @@ class Origin(BaseModel):
     ip: str
     country: Optional[str] = None
     city: Optional[str] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
     isVpnOrHosting: bool = False
 
 

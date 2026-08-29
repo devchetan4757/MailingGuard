@@ -15,16 +15,19 @@ import { useNavigate } from "react-router-dom";
 import {
   Radar,
   Server,
-  MapPin,
   Globe2,
   Building2,
   ShieldAlert,
   ShieldCheck,
   ArrowRight,
+  Hash,
+  Network,
+  MapPinned,
 } from "lucide-react";
 
 import { useCaseContext } from "../context/CaseContext";
 import { DashboardPanel } from "../components/dashboard/DashboardWidgets";
+import TraceMap from "../components/results/TraceMap";
 
 export default function OriginAnalysisPage() {
   const navigate = useNavigate();
@@ -69,49 +72,89 @@ export default function OriginAnalysisPage() {
           </h1>
 
           <div className="reference-head-actions">
-            <span className="ref-origin-eyebrow-tag">CASE #{currentCase.caseId}</span>
+            <span className="ref-origin-eyebrow-tag ref-origin-eyebrow-live">
+              <Radar size={12} />
+              CASE #{currentCase.caseId}
+            </span>
           </div>
         </header>
+
+        <div className="ref-origin-verdict" data-severity={flagged ? "flagged" : "clean"}>
+          <div className="ref-origin-verdict-badge">
+            {flagged ? <ShieldAlert size={22} /> : <ShieldCheck size={22} />}
+          </div>
+
+          <div className="ref-origin-verdict-copy">
+            <h2>{flagged ? "This origin looks suspicious" : "This origin looks clean"}</h2>
+            <p>
+              <strong>{origin.ip || "Unknown IP"}</strong>
+              {origin.city ? ` · ${origin.city}, ${origin.country || "—"}` : " · location unavailable"}
+            </p>
+          </div>
+
+          <div className="ref-origin-verdict-tags">
+            <span className={`ref-origin-verdict-tag ${origin.isVpnOrHosting ? "tone-warn" : "tone-ok"}`}>
+              {origin.isVpnOrHosting ? "Hosting / VPN" : "Residential / corp"}
+            </span>
+            <span className={`ref-origin-verdict-tag ${origin.blacklisted ? "tone-warn" : "tone-ok"}`}>
+              {origin.blacklisted ? "Blacklisted" : "Not blacklisted"}
+            </span>
+          </div>
+        </div>
 
         <div className="ref-grid-two">
           <DashboardPanel title="Sending origin">
             <div className="ref-origin-fields">
-              <div className="ref-origin-field">
-                <span>IP address</span>
-                <strong>{origin.ip || "—"}</strong>
+              <div className="ref-origin-field ref-origin-field--headline">
+                <div className="ref-origin-field-icon">
+                  <Network size={14} />
+                </div>
+                <div className="ref-origin-field-text">
+                  <span>IP address</span>
+                  <strong>{origin.ip || "—"}</strong>
+                </div>
               </div>
               <div className="ref-origin-field">
-                <span>Hostname</span>
-                <strong>{origin.hostname || "—"}</strong>
+                <div className="ref-origin-field-icon">
+                  <MapPinned size={14} />
+                </div>
+                <div className="ref-origin-field-text">
+                  <span>Hostname</span>
+                  <strong>{origin.hostname || "—"}</strong>
+                </div>
               </div>
               <div className="ref-origin-field">
-                <span>ISP / Organization</span>
-                <strong>{origin.isp || "—"}</strong>
+                <div className="ref-origin-field-icon">
+                  <Building2 size={14} />
+                </div>
+                <div className="ref-origin-field-text">
+                  <span>ISP / Organization</span>
+                  <strong>{origin.isp || "—"}</strong>
+                </div>
               </div>
               <div className="ref-origin-field">
-                <span>ASN</span>
-                <strong>{origin.asn || "—"}</strong>
+                <div className="ref-origin-field-icon">
+                  <Hash size={14} />
+                </div>
+                <div className="ref-origin-field-text">
+                  <span>ASN</span>
+                  <strong>{origin.asn || "—"}</strong>
+                </div>
               </div>
             </div>
           </DashboardPanel>
 
           <DashboardPanel title="Server location">
-            <div className="ref-origin-map">
-              <div className="ref-origin-map-pin">
-                <MapPin size={20} />
-              </div>
-              <strong>
-                {origin.city ? `${origin.city}, ${origin.country}` : "Location unavailable"}
-              </strong>
-              <span>{origin.region || "Region not reported"}</span>
-            </div>
+            <TraceMap origin={origin} />
           </DashboardPanel>
         </div>
 
         <DashboardPanel title="Network signals">
           <ul className="ref-signal-list">
             <li className={`ref-signal-item level-${origin.isVpnOrHosting ? "medium" : "low"}`}>
-              {origin.isVpnOrHosting ? <ShieldAlert size={15} /> : <ShieldCheck size={15} />}
+              <span className="ref-signal-icon">
+                {origin.isVpnOrHosting ? <ShieldAlert size={14} /> : <ShieldCheck size={14} />}
+              </span>
               <span>
                 {origin.isVpnOrHosting
                   ? "Origin IP resolves to a hosting/VPN provider, not a residential or corporate network."
@@ -120,7 +163,9 @@ export default function OriginAnalysisPage() {
             </li>
 
             <li className={`ref-signal-item level-${origin.blacklisted ? "high" : "low"}`}>
-              {origin.blacklisted ? <ShieldAlert size={15} /> : <ShieldCheck size={15} />}
+              <span className="ref-signal-icon">
+                {origin.blacklisted ? <ShieldAlert size={14} /> : <ShieldCheck size={14} />}
+              </span>
               <span>
                 {origin.blacklisted
                   ? "This IP appears on a known spam / abuse blacklist."
@@ -130,7 +175,7 @@ export default function OriginAnalysisPage() {
           </ul>
         </DashboardPanel>
 
-        <div className="ref-origin-footer">
+        <div className="ref-origin-footer" data-severity={flagged ? "flagged" : "clean"}>
           <div className="ref-origin-footer-icon">
             <Server size={14} />
           </div>
