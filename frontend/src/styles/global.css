@@ -717,6 +717,147 @@ svg {
 
 
 /* =========================================================
+   DASHBOARD UPLOAD SHORTCUT
+   ========================================================= */
+
+.ref-dashboard-upload {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+
+  margin-bottom: 10px;
+  padding: 16px 18px;
+
+  border: 1px solid #d2dadd;
+  border-radius: 10px;
+
+  background: rgba(255, 255, 255, 0.92);
+
+  box-shadow:
+    0 2px 8px rgba(38, 53, 59, 0.055);
+
+  cursor: pointer;
+
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.ref-dashboard-upload:hover {
+  border-color: #9fd3d8;
+
+  box-shadow:
+    0 4px 14px rgba(38, 53, 59, 0.1);
+
+  transform: translateY(-1px);
+}
+
+.ref-dashboard-upload:focus-visible {
+  outline: 2px solid #3d979e;
+  outline-offset: 2px;
+}
+
+.ref-dashboard-upload-main {
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.ref-dashboard-upload-icon {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid #bfe3e6;
+  border-radius: 9px;
+
+  background: #e8f6f7;
+  color: #3d979e;
+}
+
+.ref-dashboard-upload-main > div {
+  min-width: 0;
+}
+
+.ref-dashboard-upload-eyebrow {
+  display: block;
+
+  margin-bottom: 3px;
+
+  color: #67aab1;
+
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.ref-dashboard-upload-main h2 {
+  margin: 0 0 3px;
+
+  color: #171e21;
+
+  font-size: 16px;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.ref-dashboard-upload-main p {
+  margin: 0;
+  max-width: 46ch;
+
+  color: #647177;
+
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.ref-dashboard-upload-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+
+  height: 36px;
+  padding: 0 14px;
+
+  border-radius: 8px;
+
+  background: #3d979e;
+  color: #ffffff;
+
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+
+  transition: background 0.15s ease;
+}
+
+.ref-dashboard-upload:hover .ref-dashboard-upload-action {
+  background: #327d83;
+}
+
+@media (max-width: 640px) {
+  .ref-dashboard-upload {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .ref-dashboard-upload-action {
+    align-self: flex-end;
+  }
+}
+
+
+/* =========================================================
    GAUGE
    ========================================================= */
 
