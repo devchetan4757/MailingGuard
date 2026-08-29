@@ -152,15 +152,17 @@ export default function AnalysisPage() {
           <DashboardPanel title="Authentication checks">
             <div className="ref-checklist">
               {checkKeys.map((key) => {
-                const value = hc[key];
+                const rawValue = hc[key];
+                const value = rawValue === "pass" || rawValue === "fail" ? rawValue : "unknown";
                 const failed = value === "fail";
+                const passed = value === "pass";
 
                 return (
                   <div className="ref-check-row" key={key}>
-                    <div className={`ref-check-status ${failed ? "is-fail" : "is-pass"}`}>
-                      {failed ? <XCircle size={16} /> : <CheckCircle2 size={16} />}
+                    <div className={`ref-check-status ${failed ? "is-fail" : passed ? "is-pass" : "is-unknown"}`}>
+                      {failed ? <XCircle size={16} /> : passed ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
                       {CHECK_META[key].label}
-                      <span>{value || "n/a"}</span>
+                      <span>{value === "unknown" ? "not checked" : value}</span>
                     </div>
                     <p>{CHECK_META[key].desc}</p>
                   </div>

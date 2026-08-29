@@ -1,24 +1,4 @@
 // src/components/dashboard/EmailParsingPanel.jsx
-/**
- * Shows the parsing output for the most recently analyzed email — header
- * fields, URLs/attachments/header findings, the content-risk chart, and
- * the SPF/DKIM/DMARC result.
- *
- * Wired to the REAL /api/analyze response shape (see
- * backend/app/api/analyze.py + backend/app/services/parsing.py):
- *
- *   currentCase.analysis.metadata: {
- *     from, to, cc, bcc, subject, date, reply_to,
- *     message_id, return_path, received_spf, dkim_signature,
- *     x_mailer, x_originating_ip
- *   }
- *   currentCase.analysis.urls: string[]
- *   currentCase.analysis.attachments: [{ filename, content_type, size,
- *     extension, suspicious, reason }]
- *   currentCase.analysis.header_findings: [{ type, severity, message }]
- *   currentCase.headerChecks: { spf, dkim, dmarc, senderDomainMismatch }
- *   currentCase.dashboard.contentRisk: [{ name, total, suspicious }]
- */
 
 import {
   Link2,
@@ -28,6 +8,12 @@ import {
   CheckCircle2,
   XCircle,
   AlertTriangle,
+  ShieldCheck,
+  ShieldAlert,
+  Mail,
+  Globe2,
+  Clock3,
+  UserRound,
 } from "lucide-react";
 
 import {
@@ -38,68 +24,162 @@ import {
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
 
 import { DashboardPanel, DashboardStat } from "./DashboardWidgets";
 
 const AUTH_KEYS = ["spf", "dkim", "dmarc"];
 
-function AuthChip({ label, value }) {
-  const failed = value === "fail";
-  return (
-    <div className={`ref-auth-chip ${failed ? "is-fail" : "is-pass"}`}>
-      {failed ? <XCircle size={14} /> : <CheckCircle2 size={14} />}
-      {label}
-      <span>{value || "n/a"}</span>
-    </div>
-  );
-}
-
 function ContentRiskChart({ data }) {
-  const hasAny = data.some((d) => d.total > 0);
+  const safeData = data.map((item) => ({
+    ...item,
+    total: Number(item.total || 0),
+    suspicious: Number(item.suspicious || 0),
+  }));
 
-  if (!hasAny) {
-    return (
-      <p className="ref-empty-inline" style={{ padding: "0 17px 12px" }}>
-        No URLs, attachments, or header findings in this email.
-      </p>
-    );
-  }
+  const hasAny = safeData.some((d) => d.total > 0);
+  if (!hasAny) return <EmptyBlock text="No URLs, attachments, or header findings were detected." />;
 
   return (
-    <div style={{ padding: "4px 12px 14px" }}>
-      <ResponsiveContainer width="100%" height={180}>
-        <BarChart data={data} margin={{ top: 8, right: 12, left: -18, bottom: 0 }}>
-          <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="rgba(0,0,0,.06)" />
-          <XAxis
-            dataKey="name"
-            tick={{ fontSize: 11, fill: "#9aa3a6" }}
-            axisLine={false}
-            tickLine={false}
+    <div className="ref-analysis-chart-wrap">
+      <div className="ref-analysis-chart-title">
+        <div>
+          <span>CONTENT EXPOSURE</span>
+          <strong>What the parser found</strong>
+        </div>
+        <div className="ref-chart-legend">
+          <i className="legend-total" /> Total
+          <i className="legend-suspicious" /> Suspicious
+        </div>
+      </div>
+
+      <ResponsiveContainer width="100%" height={225}>
+        <BarChart data={safeData} margin={{ top: 14, right: 8, left: -20, bottom: 4 }} barGap={7}>
+          <CartesianGrid vertical={false} stroke="rgba(38,58,67,.08)" strokeDasharray="4 5" />
+          <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#718087" }} axisLine={false} tickLine={false} />
+          <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: "#8b969b" }} axisLine={false} tickLine={false} />
+          <Tooltip
+            cursor={{ fill: "rgba(85,174,181,.06)" }}
+            contentStyle={{ borderRadius: 10, border: "1px solid #d9e3e5", boxShadow: "0 8px 24px rgba(35,55,61,.10)" }}
           />
-          <YAxis
-            allowDecimals={false}
-            tick={{ fontSize: 11, fill: "#9aa3a6" }}
-            axisLine={false}
-            tickLine={false}
-          />
-          <Tooltip />
-          <Bar dataKey="total" name="Total" fill="#9fc3d8" radius={[4, 4, 0, 0]} />
-          <Bar dataKey="suspicious" name="Suspicious" fill="#e0685f" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="total" name="Total" fill="#9fc3d8" radius={[7, 7, 2, 2]} />
+          <Bar dataKey="suspicious" name="Suspicious" fill="#df7469" radius={[7, 7, 2, 2]} />
         </BarChart>
       </ResponsiveContainer>
     </div>
   );
 }
 
+function normaliseAuthValue(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "pass") return "pass";
+  if (normalized === "fail") return "fail";
+  return "unknown";
+}
+
+function AuthChart({ checks, analysis }) {
+  const authentication = analysis?.authentication || {};
+
+  // Prefer the API's normalized headerChecks, but fall back to the detailed
+  // parser authentication object when a field is missing.
+  const auth = Object.fromEntries(
+    AUTH_KEYS.map((key) => {
+      const fallback = authentication?.[key]?.result;
+      return [key, normaliseAuthValue(checks?.[key] ?? fallback)];
+    })
+  );
+
+  const pass = AUTH_KEYS.filter((key) => auth[key] === "pass").length;
+  const fail = AUTH_KEYS.filter((key) => auth[key] === "fail").length;
+  const unknown = AUTH_KEYS.length - pass - fail;
+  const known = pass + fail;
+
+  const data = [
+    { name: "Passed", value: pass },
+    { name: "Failed", value: fail },
+    { name: "Not checked", value: unknown },
+  ].filter((x) => x.value > 0);
+
+  // Unknown authentication must NOT make a message look like a 0% result.
+  // A percentage is only meaningful when the email actually contains an
+  // authentication result.
+  const score = known ? Math.round((pass / known) * 100) : null;
+
+  return (
+    <div className="ref-auth-visual">
+      <div className="ref-auth-donut">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie data={data} dataKey="value" nameKey="name" innerRadius="68%" outerRadius="92%" paddingAngle={3} stroke="none">
+              {data.map((entry) => (
+                <Cell key={entry.name} fill={entry.name === "Passed" ? "#56a98a" : entry.name === "Failed" ? "#df7469" : "#cbd5d8"} />
+              ))}
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="ref-auth-donut-center">
+          <strong>{score === null ? "—" : `${score}%`}</strong>
+          <span>{known ? `${known}/3 checked` : "not available"}</span>
+        </div>
+      </div>
+
+      <div className="ref-auth-breakdown">
+        {AUTH_KEYS.map((key) => {
+          const value = auth[key];
+          const failed = value === "fail";
+          const passed = value === "pass";
+          return (
+            <div className="ref-auth-breakdown-row" key={key}>
+              <span className={`ref-auth-dot ${failed ? "fail" : passed ? "pass" : "unknown"}`} />
+              <b>{key.toUpperCase()}</b>
+              <span>{value === "unknown" ? "not checked" : value}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function MetadataGrid({ metadata }) {
+  const fields = [
+    ["Subject", metadata.subject, Mail],
+    ["From", metadata.from, UserRound],
+    ["To", metadata.to, UserRound],
+    ["Date", metadata.date, Clock3],
+    ["Reply-To", metadata.reply_to, Mail],
+    ["Return-Path", metadata.return_path, Mail],
+    ["Message-ID", metadata.message_id, ListChecks],
+    ["Originating IP", metadata.x_originating_ip, Globe2],
+  ];
+
+  return (
+    <div className="ref-meta-grid">
+      {fields.map(([label, value, Icon]) => (
+        <div className="ref-meta-card" key={label}>
+          <div className="ref-meta-icon"><Icon size={14} /></div>
+          <div>
+            <span>{label}</span>
+            <strong title={value || "—"}>{value || "—"}</strong>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function EmptyBlock({ text }) {
+  return <p className="ref-empty-inline ref-analysis-empty-note">{text}</p>;
+}
+
 export default function EmailParsingPanel({ currentCase }) {
   if (!currentCase) {
     return (
-      <DashboardPanel title="Email parsing">
-        <p className="ref-empty-inline">
-          Upload an email above to see its parsed headers, URLs, attachments, and
-          authentication results here.
-        </p>
+      <DashboardPanel title="Email analysis">
+        <EmptyBlock text="Upload an email above to see its parsed headers, links, attachments, authentication health, and threat indicators." />
       </DashboardPanel>
     );
   }
@@ -107,119 +187,124 @@ export default function EmailParsingPanel({ currentCase }) {
   const analysis = currentCase.analysis || {};
   const metadata = analysis.metadata || {};
   const hc = currentCase.headerChecks || {};
-
   const urls = analysis.urls || [];
   const attachments = analysis.attachments || [];
   const headerFindings = analysis.header_findings || [];
 
-  const contentRisk =
-    currentCase.dashboard?.contentRisk || [
-      { name: "URLs", total: urls.length, suspicious: 0 },
-      {
-        name: "Attachments",
-        total: attachments.length,
-        suspicious: attachments.filter((a) => a.suspicious).length,
-      },
-      { name: "Header Findings", total: headerFindings.length, suspicious: headerFindings.length },
-    ];
+  const contentRisk = currentCase.dashboard?.contentRisk || [
+    { name: "URLs", total: urls.length, suspicious: 0 },
+    { name: "Attachments", total: attachments.length, suspicious: attachments.filter((a) => a.suspicious).length },
+    { name: "Header findings", total: headerFindings.length, suspicious: headerFindings.length },
+  ];
 
-  // Flagged sections list: real header-relationship findings + any
-  // attachment the analyzer flagged as suspicious.
   const flags = [
     ...headerFindings.map((f) => ({
       text: f.type?.replace(/_/g, " ") || "Header anomaly",
       reason: f.message,
       level: f.severity === "high" ? "high" : f.severity === "medium" ? "medium" : "low",
     })),
-    ...attachments
-      .filter((a) => a.suspicious)
-      .map((a) => ({
-        text: a.filename || "Attachment",
-        reason: a.reason || "Flagged as a suspicious attachment type.",
-        level: "high",
-      })),
+    ...attachments.filter((a) => a.suspicious).map((a) => ({
+      text: a.filename || "Attachment",
+      reason: a.reason || "Flagged as a suspicious attachment type.",
+      level: "high",
+    })),
   ];
 
+  const severity = currentCase.severity || "yellow";
+  const risk = Number(currentCase.riskScore || 0);
+
   return (
-    <DashboardPanel
-      title="Email parsing"
-      right={<span className="ref-origin-eyebrow-tag">CASE #{currentCase.caseId}</span>}
-    >
-      <div className="ref-parse-fields">
-        <div className="ref-origin-field">
-          <span>Subject</span>
-          <strong>{metadata.subject || "—"}</strong>
+    <div className="ref-email-analysis-stack">
+      <DashboardPanel
+        title="Email analysis overview"
+        right={<span className={`ref-analysis-severity severity-${severity}`}>{severity} risk · {risk}%</span>}
+      >
+        <div className="ref-analysis-hero-grid">
+          <div className="ref-analysis-risk-card" data-severity={severity}>
+            <div className="ref-analysis-risk-ring" style={{ "--risk": `${risk}%` }}>
+              <div>
+                <strong>{risk}</strong>
+                <span>/ 100</span>
+              </div>
+            </div>
+            <div>
+              <span className="ref-analysis-overline">THREAT SCORE</span>
+              <h3>{severity === "red" ? "High-risk email" : severity === "green" ? "Low-risk email" : "Needs review"}</h3>
+              <p>{currentCase.verdict || "The parser combined authentication, content and origin signals into this score."}</p>
+            </div>
+          </div>
+
+          <div className="ref-analysis-auth-card">
+            <div className="ref-analysis-overline">AUTHENTICATION HEALTH</div>
+            <AuthChart checks={hc} analysis={analysis} />
+          </div>
         </div>
-        <div className="ref-origin-field">
-          <span>From</span>
-          <strong>{metadata.from || "—"}</strong>
+
+        <div className="ref-parse-stats">
+          <DashboardStat icon={Link2} label="Links found" value={urls.length} />
+          <DashboardStat icon={Paperclip} label="Attachments" value={attachments.length} />
+          <DashboardStat icon={ListChecks} label="Header findings" value={headerFindings.length} />
         </div>
-        <div className="ref-origin-field">
-          <span>To</span>
-          <strong>{metadata.to || "—"}</strong>
-        </div>
-        <div className="ref-origin-field">
-          <span>Date</span>
-          <strong>{metadata.date || "—"}</strong>
-        </div>
-        <div className="ref-origin-field">
-          <span>Reply-To</span>
-          <strong>{metadata.reply_to || "—"}</strong>
-        </div>
-        <div className="ref-origin-field">
-          <span>Return-Path</span>
-          <strong>{metadata.return_path || "—"}</strong>
-        </div>
-        <div className="ref-origin-field">
-          <span>Message-ID</span>
-          <strong>{metadata.message_id || "—"}</strong>
-        </div>
-        <div className="ref-origin-field">
-          <span>Originating IP</span>
-          <strong>{metadata.x_originating_ip || "—"}</strong>
-        </div>
+      </DashboardPanel>
+
+      <DashboardPanel title="Parser telemetry">
+        <ContentRiskChart data={contentRisk} />
+      </DashboardPanel>
+
+      <DashboardPanel title="Email metadata" right={<span className="ref-origin-eyebrow-tag">CASE #{currentCase.caseId}</span>}>
+        <MetadataGrid metadata={metadata} />
+      </DashboardPanel>
+
+      <div className="ref-grid-two">
+        <DashboardPanel title="Threat indicators" right={<span className="ref-panel-number">{flags.length}</span>}>
+          <div className="ref-highlight-list ref-analysis-findings">
+            {flags.length === 0 ? (
+              <div className="ref-safe-state">
+                <ShieldCheck size={22} />
+                <div><strong>No flagged indicators</strong><span>No major parser findings were raised for this email.</span></div>
+              </div>
+            ) : (
+              flags.map((item, index) => (
+                <div key={index} className={`ref-analysis-finding level-${item.level}`}>
+                  {item.level === "high" ? <ShieldAlert size={17} /> : <AlertTriangle size={17} />}
+                  <div><strong>{item.text}</strong><span>{item.reason}</span></div>
+                </div>
+              ))
+            )}
+          </div>
+        </DashboardPanel>
+
+        <DashboardPanel title="Detected attachments" right={<span className="ref-panel-number">{attachments.length}</span>}>
+          {attachments.length === 0 ? (
+            <EmptyBlock text="No attachments were found in this email." />
+          ) : (
+            <div className="ref-attachment-list">
+              {attachments.map((item, index) => (
+                <div className={`ref-attachment-row ${item.suspicious ? "is-suspicious" : ""}`} key={`${item.filename}-${index}`}>
+                  <div className="ref-attachment-icon"><Paperclip size={16} /></div>
+                  <div><strong>{item.filename || "Unnamed attachment"}</strong><span>{item.content_type || item.extension || "Unknown type"}{item.size ? ` · ${item.size}` : ""}</span></div>
+                  {item.suspicious && <b>FLAGGED</b>}
+                </div>
+              ))}
+            </div>
+          )}
+        </DashboardPanel>
       </div>
 
-      <div className="ref-auth-row">
-        {AUTH_KEYS.map((key) => (
-          <AuthChip key={key} label={key.toUpperCase()} value={hc[key]} />
-        ))}
-        {hc.senderDomainMismatch && (
-          <div className="ref-auth-chip is-fail">
-            <AlertTriangle size={14} />
-            Domain mismatch
+      <DashboardPanel title="Extracted links" right={<span className="ref-panel-number">{urls.length}</span>}>
+        {urls.length === 0 ? (
+          <EmptyBlock text="No links were extracted from this email." />
+        ) : (
+          <div className="ref-url-list">
+            {urls.map((url, index) => (
+              <div className="ref-url-row" key={`${url}-${index}`}>
+                <div className="ref-url-icon"><Link2 size={14} /></div>
+                <span title={url}>{url}</span>
+              </div>
+            ))}
           </div>
         )}
-      </div>
-
-      <div className="ref-parse-stats">
-        <DashboardStat icon={Link2} label="Links found" value={urls.length} />
-        <DashboardStat icon={Paperclip} label="Attachments" value={attachments.length} />
-        <DashboardStat icon={ListChecks} label="Header findings" value={headerFindings.length} />
-      </div>
-
-      <ContentRiskChart data={contentRisk} />
-
-      <div className="ref-highlight-list">
-        <div className="ref-highlight-head">
-          <Highlighter size={13} />
-          Flagged sections
-        </div>
-
-        {flags.length === 0 ? (
-          <p className="ref-empty-inline">No flagged sections in this email.</p>
-        ) : (
-          flags.map((h, index) => (
-            <div key={index} className={`ref-signal-item level-${h.level}`}>
-              <AlertTriangle size={15} />
-              <span>
-                <strong>{h.text}</strong>
-                {h.reason ? ` — ${h.reason}` : ""}
-              </span>
-            </div>
-          ))
-        )}
-      </div>
-    </DashboardPanel>
+      </DashboardPanel>
+    </div>
   );
 }
