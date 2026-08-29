@@ -7,8 +7,6 @@ import {
   CircleHelp,
   Mail,
   RefreshCw,
-  UploadCloud,
-  ArrowUpRight,
   ShieldCheck,
   Users,
 } from "lucide-react";
@@ -156,85 +154,6 @@ export default function DashboardSections({
         <p className="ref-history-note">
           Gmail: {gmailError}
         </p>
-      )}
-
-      {/* =================================================
-          DASHBOARD UPLOAD SHORTCUT
-          ================================================= */}
-
-      <section
-        className="ref-dashboard-upload"
-        role="button"
-        tabIndex={0}
-        onClick={() => navigate("/upload")}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            navigate("/upload");
-          }
-        }}
-        aria-label="Go to Upload and Parse"
-      >
-        <div className="ref-dashboard-upload-main">
-          <div className="ref-dashboard-upload-icon">
-            <UploadCloud size={21} strokeWidth={1.9} />
-          </div>
-
-          <div>
-            <span className="ref-dashboard-upload-eyebrow">EMAIL THREAT ANALYZER</span>
-            <h2>Upload an email for analysis</h2>
-            <p>
-              Open the upload workspace to inspect an .eml file, parse its headers,
-              links, attachments and authentication signals.
-            </p>
-          </div>
-        </div>
-
-        <div className="ref-dashboard-upload-action">
-          <span>Upload &amp; Parse</span>
-          <ArrowUpRight size={17} />
-        </div>
-      </section>
-
-      {/* =================================================
-          GMAIL LIVE LOAD STATUS
-          ================================================= */}
-
-      {gmailIsChunkLoading && (
-        <section className="ref-mail-loading" aria-live="polite">
-          <div className="ref-mail-loading-orbit" aria-hidden="true">
-            <div className="ref-mail-loading-ring" />
-            <Mail size={18} />
-          </div>
-
-          <div className="ref-mail-loading-copy">
-            <div className="ref-mail-loading-title">
-              Loading your mailbox
-              <span className="ref-loading-dots" aria-hidden="true">
-                <i />
-                <i />
-                <i />
-              </span>
-            </div>
-            <p>
-              Fetching Gmail messages and updating the dashboard in real time.
-            </p>
-
-            <div className="ref-mail-progress">
-              <span
-                style={{
-                  width: `${Math.min(100, Math.max(0, (gmailLoadProgress.loaded / Math.max(gmailLoadProgress.total, 1)) * 100))}%`,
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="ref-mail-loading-count">
-            <strong>{gmailLoadProgress.loaded}</strong>
-            <span>/ {gmailLoadProgress.total}</span>
-            <small>emails</small>
-          </div>
-        </section>
       )}
 
 
