@@ -23,6 +23,7 @@ import {
   Hash,
   Network,
   MapPinned,
+  FileDown,
 } from "lucide-react";
 
 import { useCaseContext } from "../context/CaseContext";
@@ -190,6 +191,13 @@ export default function OriginAnalysisPage() {
               ? "This origin carries at least one network-level red flag — cross-check it against the AI Deep Analysis page before closing the case."
               : "No network-level red flags on this origin."}
           </span>
+        </div>
+
+        <div className="ref-analysis-actions">
+          <button type="button" className="ref-download-btn" onClick={() => navigate("/reports")}>
+            <FileDown size={16} />
+            Preview &amp; download full report
+          </button>
         </div>
       </div>
     </main>

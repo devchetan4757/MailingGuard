@@ -16,7 +16,7 @@ import {
   CheckCircle2,
   XCircle,
   ArrowRight,
-  Download,
+  FileDown,
   Sparkles,
 } from "lucide-react";
 
@@ -24,7 +24,6 @@ import { useCaseContext } from "../context/CaseContext";
 import { DashboardPanel, RiskGauge } from "../components/dashboard/DashboardWidgets";
 import AiBadge from "../components/dashboard/AiBadge";
 import EmailParsingPanel from "../components/dashboard/EmailParsingPanel";
-import { getCaseReportUrl } from "../api/casesApi";
 
 const CHECK_META = {
   spf: {
@@ -213,10 +212,10 @@ export default function AnalysisPage() {
         </DashboardPanel>
 
         <div className="ref-analysis-actions">
-          <a href={getCaseReportUrl(currentCase.caseId)} download className="ref-download-btn">
-            <Download size={16} />
-            Download full report (PDF)
-          </a>
+          <button type="button" className="ref-download-btn" onClick={() => navigate("/reports")}>
+            <FileDown size={16} />
+            Preview &amp; download full report
+          </button>
         </div>
       </div>
     </main>
