@@ -33,14 +33,51 @@ function hemi(value, positiveLabel, negativeLabel) {
   return `${Math.abs(value).toFixed(2)}° ${value >= 0 ? positiveLabel : negativeLabel}`;
 }
 
-export default function TraceMap({ origin = {}, compact = false }) {
+export default function TraceMap({
+  origin = {},
+  trace = {},
+  compact = false,
+}) {
   const hasCoords =
     typeof origin.lat === "number" &&
     typeof origin.lng === "number" &&
     !Number.isNaN(origin.lat) &&
     !Number.isNaN(origin.lng);
 
-  const flagged = Boolean(origin.isVpnOrHosting);
+  const flagged = Boolean(
+    origin.isVpnOrHosting ||
+    origin.blacklisted ||
+    trace.summary?.overall_suspicious
+  );
+
+  const traceHops = Array.isArray(trace.hops)
+    ? trace.hops.filter(
+        (hop) =>
+          typeof hop.lat === "number" &&
+          typeof hop.lon === "number" &&
+          !Number.isNaN(hop.lat) &&
+          !Number.isNaN(hop.lon)
+      )
+    : [];
+
+  const plottedHops =
+    traceHops.length > 0
+      ? traceHops
+      : hasCoords
+        ? [{
+            ...origin,
+            lat: origin.lat,
+            lon: origin.lng,
+            flagged,
+          }]
+        : [];
+
+  const points = plottedHops.map((hop) => ({
+    ...hop,
+    x: lngToX(hop.lon),
+    y: latToY(hop.lat),
+  }));
+
   const pinX = hasCoords ? lngToX(origin.lng) : null;
   const pinY = hasCoords ? latToY(origin.lat) : null;
 
@@ -93,19 +130,42 @@ export default function TraceMap({ origin = {}, compact = false }) {
           <line x1={lngToX(0)} y1={0} x2={lngToX(0)} y2={VIEW_H} className="ref-tracemap-axis" />
           <line x1={0} y1={latToY(0)} x2={VIEW_W} y2={latToY(0)} className="ref-tracemap-axis" />
 
+          {points.length > 1 && (
+            <polyline
+              points={points.map((point) => `${point.x},${point.y}`).join(" ")}
+              className="ref-tracemap-route"
+              fill="none"
+            />
+          )}
+
+          {points.map((point, index) => (
+            <g
+              key={`${point.ip || "point"}-${index}`}
+              className={point.flagged ? "ref-tracemap-pin is-flagged" : "ref-tracemap-pin"}
+            >
+              <circle
+                cx={point.x}
+                cy={point.y}
+                r={index === 0 ? "8" : "6"}
+                className="ref-tracemap-ring ref-tracemap-ring--inner"
+              />
+              {point.flagged && (
+                <circle
+                  cx={point.x}
+                  cy={point.y}
+                  r="7"
+                  className="ref-tracemap-pulse"
+                />
+              )}
+              <circle cx={point.x} cy={point.y} r="2.8" className="ref-tracemap-dot" />
+              <circle cx={point.x} cy={point.y} r="1" className="ref-tracemap-dot-core" />
+            </g>
+          ))}
+
           {hasCoords && (
             <>
-              {/* crosshair guides from the frame edges to the pin */}
               <line x1={pinX} y1="0" x2={pinX} y2={VIEW_H} className="ref-tracemap-crosshair" />
               <line x1="0" y1={pinY} x2={VIEW_W} y2={pinY} className="ref-tracemap-crosshair" />
-
-              <g className={flagged ? "ref-tracemap-pin is-flagged" : "ref-tracemap-pin"}>
-                <circle cx={pinX} cy={pinY} r="10" className="ref-tracemap-ring ref-tracemap-ring--outer" />
-                <circle cx={pinX} cy={pinY} r="6" className="ref-tracemap-ring ref-tracemap-ring--inner" />
-                {flagged && <circle cx={pinX} cy={pinY} r="7" className="ref-tracemap-pulse" />}
-                <circle cx={pinX} cy={pinY} r="3.2" className="ref-tracemap-dot" />
-                <circle cx={pinX} cy={pinY} r="1.1" className="ref-tracemap-dot-core" />
-              </g>
             </>
           )}
 
@@ -118,10 +178,10 @@ export default function TraceMap({ origin = {}, compact = false }) {
           />
         </svg>
 
-        {hasCoords && (
+        {points.length > 0 && (
           <div className="ref-tracemap-coords">
-            <span>{hemi(origin.lat, "N", "S")}</span>
-            <span>{hemi(origin.lng, "E", "W")}</span>
+            <span>{hemi(points[0].lat, "N", "S")}</span>
+            <span>{hemi(points[0].lon, "E", "W")}</span>
           </div>
         )}
 
@@ -134,9 +194,16 @@ export default function TraceMap({ origin = {}, compact = false }) {
       <div className="ref-tracemap-readout">
         <strong>{origin.ip || "Unknown IP"}</strong>
         <span>
-          {origin.city ? `${origin.city}, ${origin.country || "—"}` : "Location unavailable"}
+          {origin.city ? `${origin.city}, ${origin.country || "?"}` : "Location unavailable"}
         </span>
-        {flagged && <span className="ref-tracemap-flag">hosting / VPN — flagged</span>}
+        {points.length > 1 && (
+          <span>{points.length} geolocated hops connected</span>
+        )}
+        {flagged && (
+          <span className="ref-tracemap-flag">
+            network signal flagged
+          </span>
+        )}
       </div>
     </div>
   );
