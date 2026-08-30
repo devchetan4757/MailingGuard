@@ -27,7 +27,8 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 from app.core.security import validate_upload
 from app.services.parsing import parse_eml
 from app.services.scoring import score_email
-from app.services.geolocation import locate_ip
+from app.services.origin.config import load_config
+from app.services.origin.service import OriginAnalysisService
 from app.services.similarity import find_related_cases
 from app.services.hashchain import compute_case_hash
 from app.services import store
@@ -35,6 +36,10 @@ from app.models.schemas import AnalyzeResponse
 
 
 router = APIRouter()
+
+origin_service = OriginAnalysisService(
+    load_config()
+)
 
 
 def _build_dashboard(
@@ -417,15 +422,48 @@ async def run_analysis(
     )
 
     # ---------------------------------------------------------------
-    # Existing origin analysis
+    # Origin Analysis
     # ---------------------------------------------------------------
 
-    origin = locate_ip(
-        parsed.get(
-            "origin_ip"
-        )
-        or ""
+    case_id = (
+        f"case-{len(store.all_cases()) + 1}"
     )
+
+    origin_analysis = await origin_service.analyze(
+        parsed.get(
+            "received_chain",
+            [],
+        ),
+        case_id=case_id,
+        from_domain=parsed.get(
+            "from_domain"
+        ),
+        base_risk=int(
+            score.get(
+                "riskScore",
+                0,
+            )
+            or 0
+        ),
+    )
+
+    raw_origin = origin_analysis.get("origin") or {}
+
+    # Preserve the existing MailingGuard Origin contract.
+    origin = {
+        "ip": raw_origin.get("ip")
+        or parsed.get("origin_ip")
+        or "",
+        "country": raw_origin.get("country"),
+        "city": raw_origin.get("city"),
+        "lat": raw_origin.get("lat"),
+        "lng": raw_origin.get("lng", raw_origin.get("lon")),
+        "isVpnOrHosting": bool(
+            raw_origin.get("isVpnOrHosting")
+            or raw_origin.get("hosting")
+            or raw_origin.get("proxy")
+        ),
+    }
 
     # ---------------------------------------------------------------
     # Existing similarity analysis
@@ -440,10 +478,6 @@ async def run_analysis(
     # ---------------------------------------------------------------
     # Existing case/hash chain
     # ---------------------------------------------------------------
-
-    case_id = (
-        f"case-{len(store.all_cases()) + 1}"
-    )
 
     previous_hash = (
         store.last_case_hash()
@@ -572,6 +606,14 @@ async def run_analysis(
         },
 
         "origin": origin,
+
+        "origin_trace": origin_analysis.get("origin_trace"),
+
+        "origin_analysis": {
+            "risk": origin_analysis.get("risk"),
+            "correlation": origin_analysis.get("correlation"),
+            "cache_stats": origin_analysis.get("cache_stats"),
+        },
 
         "relatedCases": related,
 
