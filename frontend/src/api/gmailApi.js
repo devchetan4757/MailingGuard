@@ -118,6 +118,29 @@ export function clearGmailCache() {
   });
 }
 
+/**
+ * Fetch a single Gmail message's full content for reading — subject,
+ * sender/recipients, date, body (text/html) and attachment metadata.
+ * Plain "open the email" read; does not analyze or create a case.
+ */
+export function getGmailMessageContent(messageId) {
+  return apiFetch(`/integrations/gmail/messages/${messageId}`);
+}
+
+/**
+ * Hand a single loaded Gmail message over to the analysis pipeline.
+ * Fetches the message's raw content on the backend and runs it
+ * through the exact same parse/score/origin pipeline as an uploaded
+ * .eml (POST /analyze), so the result can be opened on either the
+ * AI Deep Analysis page or the Origin Analysis page.
+ */
+export function analyzeGmailMessage(messageId) {
+  return apiFetch(
+    `/integrations/gmail/messages/${messageId}/analyze`,
+    { method: "POST" }
+  );
+}
+
 export async function connectGmail() {
   const data = await apiFetch(
     "/integrations/gmail/connect"

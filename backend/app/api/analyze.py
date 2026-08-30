@@ -377,26 +377,28 @@ def _build_dashboard(
     }
 
 
-@router.post(
-    "/analyze",
-    response_model=AnalyzeResponse,
-)
-async def analyze_email(
-    file: UploadFile = File(...),
-):
-    content = await file.read()
+async def run_analysis(
+    content: bytes,
+    filename: str,
+) -> dict:
+    """
+    Shared analysis pipeline.
 
-    try:
-        validate_upload(
-            file.filename,
-            content,
-        )
+    Runs the full parse -> score -> origin -> similarity -> case/hash
+    chain -> dashboard pipeline for raw .eml bytes, regardless of
+    whether they came from a direct file upload (POST /analyze) or
+    from a Gmail message handed over for analysis
+    (POST /integrations/gmail/messages/{id}/analyze).
 
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=400,
-            detail=str(exc),
-        ) from exc
+    Raises ValueError (bad upload, e.g. too large) — callers are
+    expected to translate that into the appropriate HTTP error for
+    their own endpoint.
+    """
+
+    validate_upload(
+        filename,
+        content,
+    )
 
     # ---------------------------------------------------------------
     # Parse with the integrated real analyzer
@@ -597,3 +599,25 @@ async def analyze_email(
     )
 
     return response
+
+
+@router.post(
+    "/analyze",
+    response_model=AnalyzeResponse,
+)
+async def analyze_email(
+    file: UploadFile = File(...),
+):
+    content = await file.read()
+
+    try:
+        return await run_analysis(
+            content,
+            filename=file.filename,
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc

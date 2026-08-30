@@ -13,6 +13,7 @@ Current scope:
 Deep email/security analysis is intentionally NOT handled here.
 """
 
+import base64
 import json
 import logging
 from pathlib import Path
@@ -26,9 +27,12 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 from app.core.config import settings
 from app.services.gmail_cache import GmailCache
+from app.services.parsing import parse_eml
+from app.api.analyze import run_analysis
 
 
 router = APIRouter(
@@ -325,6 +329,48 @@ def fetch_message_detail(
             [],
         ),
     }
+
+
+def fetch_message_raw(
+    service,
+    message_id: str,
+) -> bytes:
+    """
+    Fetch a single Gmail message as raw RFC 822 bytes (the same shape
+    as an uploaded .eml file), so it can be handed straight to the
+    shared analysis pipeline in app.api.analyze.
+    """
+
+    message = (
+        service.users()
+        .messages()
+        .get(
+            userId="me",
+            id=message_id,
+            format="raw",
+        )
+        .execute()
+    )
+
+    raw = message.get("raw")
+
+    if not raw:
+        raise HTTPException(
+            status_code=502,
+            detail="Gmail did not return raw message content.",
+        )
+
+    # Gmail returns URL-safe base64 without guaranteed padding.
+    padding = "=" * (-len(raw) % 4)
+
+    try:
+        return base64.urlsafe_b64decode(raw + padding)
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to decode Gmail message: {exc}",
+        ) from exc
 
 
 def fetch_gmail_messages(
@@ -802,6 +848,145 @@ def get_gmail_messages(
                 f"Failed to fetch Gmail messages: {exc}"
             ),
         )
+
+
+# ============================================================
+# Read a single loaded Gmail message (full content, not analysis)
+# ============================================================
+
+@router.get("/messages/{message_id}")
+def get_gmail_message(
+    message_id: str,
+):
+    """
+    Fetch a single message's full content for reading — subject,
+    sender/recipients, date, body (text/html) and attachment
+    metadata. This is a plain "open the email" read, distinct from
+    POST /messages/{id}/analyze: nothing is scored, stored as a
+    case, or run through the analysis pipeline here.
+    """
+
+    service = get_gmail_service()
+
+    try:
+        content = fetch_message_raw(
+            service,
+            message_id,
+        )
+
+    except HTTPException:
+        raise
+
+    except HttpError as exc:
+        status_code = (
+            exc.resp.status
+            if getattr(exc, "resp", None)
+            else 502
+        )
+
+        raise HTTPException(
+            status_code=404 if status_code == 404 else 502,
+            detail=(
+                "Gmail message not found."
+                if status_code == 404
+                else f"Failed to fetch Gmail message: {exc}"
+            ),
+        ) from exc
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch Gmail message: {exc}",
+        ) from exc
+
+    parsed = parse_eml(content)
+
+    attachments = [
+        {
+            "filename": attachment.get("filename") or "attachment",
+            "contentType": attachment.get(
+                "content_type",
+                "application/octet-stream",
+            ),
+            "size": attachment.get("size", 0),
+        }
+        for attachment in (parsed.get("attachments") or [])
+        if isinstance(attachment, dict)
+    ]
+
+    return {
+        "id": message_id,
+        "subject": parsed.get("subject") or "(no subject)",
+        "from": parsed.get("from") or "",
+        "to": parsed.get("to") or "",
+        "cc": parsed.get("cc") or "",
+        "date": parsed.get("date") or "",
+        "bodyText": parsed.get("body_text") or "",
+        "bodyHtml": parsed.get("body_html") or "",
+        "attachments": attachments,
+    }
+
+
+# ============================================================
+# Hand a loaded Gmail message over to the analysis pipeline
+# ============================================================
+
+@router.post("/messages/{message_id}/analyze")
+async def analyze_gmail_message(
+    message_id: str,
+):
+    """
+    Fetch a single message's raw content straight from Gmail and run
+    it through the exact same pipeline as an uploaded .eml file
+    (POST /analyze) — parsing, scoring, origin lookup, similarity and
+    case/hash chain — so the result can be opened directly on either
+    the AI Deep Analysis page or the Origin Analysis page.
+    """
+
+    service = get_gmail_service()
+
+    try:
+        content = fetch_message_raw(
+            service,
+            message_id,
+        )
+
+    except HTTPException:
+        raise
+
+    except HttpError as exc:
+        status_code = (
+            exc.resp.status
+            if getattr(exc, "resp", None)
+            else 502
+        )
+
+        raise HTTPException(
+            status_code=404 if status_code == 404 else 502,
+            detail=(
+                "Gmail message not found."
+                if status_code == 404
+                else f"Failed to fetch Gmail message: {exc}"
+            ),
+        ) from exc
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch Gmail message: {exc}",
+        ) from exc
+
+    try:
+        return await run_analysis(
+            content,
+            filename=f"{message_id}.eml",
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
 
 
 # ============================================================

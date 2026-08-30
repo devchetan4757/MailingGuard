@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
+  AlertTriangle,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
-  Inbox,
-  Mail,
-  MailOpen,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -17,7 +15,13 @@ import {
 
 import { connectGmail } from "../api/gmailApi";
 import { useGmailOverview } from "../hooks/useGmailOverview";
+import { useAnalyzeGmailMessage } from "../hooks/useAnalyzeGmailMessage";
+import { useGmailMessageContent } from "../hooks/useGmailMessageContent";
+import { useCaseContext } from "../context/CaseContext";
+import { useCases } from "../hooks/useCases";
 import GmailIcon from "../components/gmail/GmailIcon";
+import MailHandoffMenu from "../components/gmail/MailHandoffMenu";
+import MailReaderModal from "../components/gmail/MailReaderModal";
 
 import "../styles/gmail.css";
 
@@ -77,6 +81,35 @@ function initialsFrom(name) {
     .toUpperCase();
 }
 
+// Personal/free-mail providers where a domain logo would just be the
+// provider's own brand (Gmail's "G", Outlook's "O"...) rather than
+// anything that identifies the actual sender — skip the logo lookup
+// for these and fall back straight to initials.
+const PERSONAL_EMAIL_DOMAINS = new Set([
+  "gmail.com",
+  "googlemail.com",
+  "yahoo.com",
+  "ymail.com",
+  "outlook.com",
+  "hotmail.com",
+  "live.com",
+  "msn.com",
+  "icloud.com",
+  "me.com",
+  "mac.com",
+  "aol.com",
+  "protonmail.com",
+  "proton.me",
+  "zoho.com",
+  "gmx.com",
+  "yandex.com",
+]);
+
+function senderDomain(email) {
+  if (!email || !email.includes("@")) return null;
+  return email.split("@")[1].trim().toLowerCase();
+}
+
 function isSameDay(a, b) {
   return (
     a.getDate() === b.getDate() &&
@@ -128,6 +161,7 @@ function accountDisplayName(email) {
    ========================================================= */
 
 export default function GmailPage() {
+  const navigate = useNavigate();
   const [connecting, setConnecting] = useState(false);
   const [mailPage, setMailPage] = useState(1);
   const [mailSearch, setMailSearch] = useState("");
@@ -146,6 +180,57 @@ export default function GmailPage() {
     sync,
     refetch,
   } = useGmailOverview();
+
+  const { setCurrentCase } = useCaseContext();
+  const { refetch: refetchCases } = useCases();
+
+  const {
+    analyze: analyzeMessage,
+    pendingId: handoffPendingId,
+    error: handoffError,
+  } = useAnalyzeGmailMessage();
+
+  const [readerMailId, setReaderMailId] = useState(null);
+  const {
+    message: readerMessage,
+    isLoading: isReaderLoading,
+    error: readerError,
+    open: openReader,
+    close: closeReaderContent,
+  } = useGmailMessageContent();
+
+  function handleOpenMail(messageId) {
+    setReaderMailId(messageId);
+    openReader(messageId).catch(() => {});
+  }
+
+  function handleCloseReader() {
+    setReaderMailId(null);
+    closeReaderContent();
+  }
+
+  // Hand a single loaded message over to the analysis pipeline, then
+  // jump straight to whichever surface the user picked — the AI Deep
+  // Analysis page and the Origin Analysis page both just read the
+  // same `currentCase`, so one analyze call feeds either.
+  async function handleHandoff(messageId, targetId) {
+    const result = await analyzeMessage(messageId).catch(() => null);
+
+    if (!result) return;
+
+    setCurrentCase(result);
+    refetchCases();
+    navigate(targetId === "origin" ? "/origin" : "/analyze");
+  }
+
+  // Reached from the reader modal's own "AI Deep Analysis" /
+  // "Origin Analysis" buttons — close the reader first so it isn't
+  // left open underneath the page we navigate to.
+  function handleHandoffFromReader(targetId) {
+    const messageId = readerMailId;
+    handleCloseReader();
+    if (messageId) handleHandoff(messageId, targetId);
+  }
 
   // Google redirects the browser straight back here after OAuth
   // (via the backend's /callback -> /gmail redirect), so pick up
@@ -467,10 +552,6 @@ export default function GmailPage() {
               </span>
 
               <div className="gmail-head-actions">
-                <span className="gmail-cache-pill">
-                  Cache · 10 min
-                </span>
-
                 <button
                   type="button"
                   className="gmail-sync-button"
@@ -511,28 +592,29 @@ export default function GmailPage() {
 
             <div className="gmail-stat-grid">
               <StatTile
-                icon={<Inbox size={16} />}
-                label="Fetched"
+                tone="cyan"
+                label="Loaded"
                 value={stats.totalFetched ?? 0}
                 loading={!dashboard}
+                title="Messages MailingGuard has pulled from Gmail into its cache"
               />
 
               <StatTile
-                icon={<Mail size={16} />}
+                tone="blue"
                 label="Today"
                 value={stats.today ?? 0}
                 loading={!dashboard}
               />
 
               <StatTile
-                icon={<RefreshCw size={16} />}
+                tone="violet"
                 label="This week"
                 value={stats.thisWeek ?? 0}
                 loading={!dashboard}
               />
 
               <StatTile
-                icon={<MailOpen size={16} />}
+                tone="amber"
                 label="Unread"
                 value={stats.unread ?? 0}
                 loading={!dashboard}
@@ -556,15 +638,21 @@ export default function GmailPage() {
                 </div>
 
                 <span className="gmail-panel-count">
-                  {filteredMessages.length}
                   {filteredMessages.length !== messages.length
-                    ? ` of ${messages.length} loaded`
-                    : " loaded"}
-                  {stats.totalFetched
-                    ? ` · ${stats.totalFetched} total`
+                    ? `${filteredMessages.length} of ${messages.length} match`
+                    : `${messages.length} shown`}
+                  {stats.totalFetched > messages.length
+                    ? ` · ${stats.totalFetched} fetched from Gmail`
                     : ""}
                 </span>
               </div>
+
+              {handoffError && (
+                <div className="gmail-handoff-error">
+                  <AlertTriangle size={13} />
+                  Couldn't hand that email over: {handoffError}
+                </div>
+              )}
 
               {dashboard && messages.length > 0 && (
                 <div className="gmail-mail-toolbar">
@@ -638,12 +726,27 @@ export default function GmailPage() {
                       return (
                         <div
                           key={message.id}
-                          className={`gmail-mail-row ${
+                          className={`gmail-mail-row gmail-mail-row--clickable ${
                             isUnread ? "is-unread" : ""
                           }`}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => handleOpenMail(message.id)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              handleOpenMail(message.id);
+                            }
+                          }}
                         >
-                          <div className="gmail-mail-avatar">
-                            {initialsFrom(sender.name)}
+                          <div className="gmail-mail-avatar-wrap">
+                            <SenderAvatar name={sender.name} email={sender.email} />
+                            {isUnread && (
+                              <span
+                                className="gmail-mail-unread-dot"
+                                aria-hidden="true"
+                              />
+                            )}
                           </div>
 
                           <div className="gmail-mail-body">
@@ -664,16 +767,16 @@ export default function GmailPage() {
                           </div>
 
                           <div className="gmail-mail-meta">
-                            {isUnread && (
-                              <span
-                                className="gmail-mail-unread-dot"
-                                aria-label="Unread"
-                              />
-                            )}
-
                             <span className="gmail-mail-date">
                               {formatMailDate(message.date)}
                             </span>
+
+                            <MailHandoffMenu
+                              isBusy={handoffPendingId === message.id}
+                              onSelect={(targetId) =>
+                                handleHandoff(message.id, targetId)
+                              }
+                            />
                           </div>
                         </div>
                       );
@@ -728,46 +831,37 @@ export default function GmailPage() {
         )}
 
         {/* =================================================
-            INFO
+            FOOTNOTE
             ================================================= */}
 
-        <section className="gmail-info-grid">
+        <section className="gmail-footnote">
+          <span className="gmail-footnote-item">
+            <ShieldCheck size={13} />
+            Read-only Gmail access — MailingGuard only reads what it
+            needs for the dashboard and analysis; it never sends,
+            deletes, or modifies mail.
+          </span>
 
-          <div className="gmail-info-card">
-            <ShieldCheck size={18} />
-
-            <div>
-              <h3>
-                Read-only access
-              </h3>
-
-              <p>
-                The current integration only
-                reads mailbox information required
-                for the dashboard.
-              </p>
-            </div>
-          </div>
-
-          <div className="gmail-info-card">
-            <RefreshCw size={18} />
-
-            <div>
-              <h3>
-                Cached for 10 minutes
-              </h3>
-
-              <p>
-                Dashboard requests reuse cached
-                Gmail data instead of repeatedly
-                requesting the Gmail API.
-              </p>
-            </div>
-          </div>
-
+          {connected && (
+            <span className="gmail-footnote-item">
+              <RefreshCw size={13} />
+              Mailbox data is cached locally for 10 minutes between
+              syncs, so the numbers above may lag a live Gmail
+              inbox slightly — hit Sync for the latest.
+            </span>
+          )}
         </section>
 
       </div>
+
+      <MailReaderModal
+        isOpen={Boolean(readerMailId)}
+        message={readerMessage}
+        isLoading={isReaderLoading}
+        error={readerError}
+        onClose={handleCloseReader}
+        onHandoff={handleHandoffFromReader}
+      />
     </main>
   );
 }
@@ -777,17 +871,45 @@ export default function GmailPage() {
    STAT TILE
    ========================================================= */
 
-function StatTile({ icon, label, value, loading }) {
+function StatTile({ label, value, loading, title, tone = "cyan" }) {
   return (
-    <div className="gmail-stat">
-      <span className="gmail-stat-icon">
-        {icon}
-      </span>
-
-      <div>
+    <div className={`gmail-stat gmail-stat--${tone}`} title={title}>
+      <div className="gmail-stat-copy">
         <span>{label}</span>
         <strong>{loading ? "…" : value}</strong>
       </div>
+    </div>
+  );
+}
+
+
+/* =========================================================
+   SENDER AVATAR
+   Shows the sending organization's public logo when the
+   sender's domain has one (e.g. a company or vendor mail),
+   and falls back to the plain initials circle for personal
+   addresses or when no logo can be found.
+   ========================================================= */
+
+function SenderAvatar({ name, email }) {
+  const [imgFailed, setImgFailed] = useState(false);
+
+  const domain = senderDomain(email);
+  const canTryLogo = Boolean(domain) && !PERSONAL_EMAIL_DOMAINS.has(domain);
+  const showImage = canTryLogo && !imgFailed;
+
+  return (
+    <div className="gmail-mail-avatar">
+      {showImage ? (
+        <img
+          src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
+          alt=""
+          loading="lazy"
+          onError={() => setImgFailed(true)}
+        />
+      ) : (
+        <span>{initialsFrom(name)}</span>
+      )}
     </div>
   );
 }
