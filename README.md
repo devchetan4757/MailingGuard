@@ -1,7 +1,7 @@
 # GitHub Team Workflow
 # MailingGuard
 
-Developed by Sahil Ahire
+Developed by Sahil Ahire,Chetan Patil, Swapnil Patil
 
 This guide explains the Git/GitHub workflow for this repository, step by step.
 
