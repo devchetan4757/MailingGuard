@@ -149,11 +149,11 @@ class OriginAnalysisService:
                 "confidence": None,
                 "cached_at": None,
             })
-            if hop.internal:
-                entry["skip_reason"] = "internal_hop"
+            if hop.internal or hop.ip is None:
+                entry["skip_reason"] = "internal_hop" if hop.internal else "no_ip"
                 entry["blacklist"] = {
                     "checked": False,
-                    "reason": "internal hop",
+                    "reason": "internal hop" if hop.internal else "no ip to check",
                     "listed": False, "lists": [], "codes": [], "abuse_score": None,
                     "error": None, "message": None,
                 }
