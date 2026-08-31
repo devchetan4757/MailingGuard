@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.analyze import router as analyze_router
 from app.api.cases import router as cases_router
 from app.api.report import router as report_router
+from app.api.origin import router as origin_router
 from app.api.integrations.gmail import router as gmail_router
 
 
@@ -107,6 +108,19 @@ app.include_router(
     prefix="/api",
     tags=[
         "Gmail Integration",
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# ORIGIN INTELLIGENCE API
+# ---------------------------------------------------------------------------
+
+app.include_router(
+    origin_router,
+    prefix="/api",
+    tags=[
+        "Origin Intelligence",
     ],
 )
 

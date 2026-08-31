@@ -146,6 +146,10 @@ class AnalyzeResponse(BaseModel):
 
     origin: Origin
 
+    # Extended Origin Intelligence output.
+    origin_trace: Optional[dict[str, Any]] = None
+    origin_analysis: Optional[dict[str, Any]] = None
+
     relatedCases: list[RelatedCase]
 
     caseHash: str

@@ -62,7 +62,17 @@ export default function OriginAnalysisPage() {
   }
 
   const origin = currentCase.origin || {};
-  const flagged = Boolean(origin.isVpnOrHosting || origin.blacklisted);
+  const originTrace = currentCase.origin_trace || {};
+  const originAnalysis = currentCase.origin_analysis || {};
+  const traceHops = originTrace.hops || [];
+  const traceSummary = originTrace.summary || {};
+  const originRisk = originAnalysis.risk || {};
+  const correlation = originAnalysis.correlation || {};
+  const flagged = Boolean(
+    origin.isVpnOrHosting ||
+    origin.blacklisted ||
+    traceSummary.overall_suspicious
+  );
 
   return (
     <main className="reference-dashboard">
@@ -146,9 +156,197 @@ export default function OriginAnalysisPage() {
           </DashboardPanel>
 
           <DashboardPanel title="Server location">
-            <TraceMap origin={origin} />
+            <TraceMap
+              origin={origin}
+              trace={originTrace}
+            />
           </DashboardPanel>
         </div>
+
+        <div className="ref-grid-two">
+          <DashboardPanel
+            title="Origin risk"
+            right={
+              <span className="ref-panel-number">
+                {originRisk.origin_points ?? 0}
+              </span>
+            }
+          >
+            <div className="ref-origin-fields">
+              <div className="ref-origin-field">
+                <div className="ref-origin-field-text">
+                  <span>Base score</span>
+                  <strong>{originRisk.base_score ?? "?"}</strong>
+                </div>
+              </div>
+
+              <div className="ref-origin-field">
+                <div className="ref-origin-field-text">
+                  <span>Origin contribution</span>
+                  <strong>+{originRisk.origin_points ?? 0}</strong>
+                </div>
+              </div>
+
+              <div className="ref-origin-field">
+                <div className="ref-origin-field-text">
+                  <span>Final score</span>
+                  <strong>{originRisk.total_score ?? "?"}</strong>
+                </div>
+              </div>
+
+              <div className="ref-origin-field">
+                <div className="ref-origin-field-text">
+                  <span>Maximum Origin contribution</span>
+                  <strong>{originRisk.origin_max_contribution ?? "?"}</strong>
+                </div>
+              </div>
+            </div>
+          </DashboardPanel>
+
+          <DashboardPanel
+            title="Trace summary"
+            right={
+              <span className="ref-panel-number">
+                {traceHops.length}
+              </span>
+            }
+          >
+            <div className="ref-origin-fields">
+              <div className="ref-origin-field">
+                <div className="ref-origin-field-text">
+                  <span>Public hops</span>
+                  <strong>{traceSummary.public_hops ?? 0}</strong>
+                </div>
+              </div>
+
+              <div className="ref-origin-field">
+                <div className="ref-origin-field-text">
+                  <span>Internal hops</span>
+                  <strong>{traceSummary.internal_hops ?? 0}</strong>
+                </div>
+              </div>
+
+              <div className="ref-origin-field">
+                <div className="ref-origin-field-text">
+                  <span>Suspicious hops</span>
+                  <strong>{traceSummary.suspicious_hops ?? 0}</strong>
+                </div>
+              </div>
+
+              <div className="ref-origin-field">
+                <div className="ref-origin-field-text">
+                  <span>Blacklisted hops</span>
+                  <strong>{traceSummary.blacklisted_hops ?? 0}</strong>
+                </div>
+              </div>
+            </div>
+          </DashboardPanel>
+        </div>
+
+        <DashboardPanel
+          title="Received hop trace"
+          right={
+            <span className="ref-panel-number">
+              {traceHops.length}
+            </span>
+          }
+        >
+          {traceHops.length === 0 ? (
+            <p className="ref-empty-inline">
+              No Received-chain hops were returned for this case.
+            </p>
+          ) : (
+            <div className="ref-related-list">
+              {traceHops.map((hop, index) => (
+                <div className="ref-related-row" key={`${hop.ip || "hop"}-${index}`}>
+                  <div>
+                    <strong>
+                      Hop {index + 1} ? {hop.ip || "Unknown IP"}
+                    </strong>
+                    <span>
+                      {hop.internal
+                        ? "Internal / private relay"
+                        : `${hop.city || "Unknown city"}${hop.country ? `, ${hop.country}` : ""}`}
+                      {" ? "}
+                      {hop.asn || "ASN unavailable"}
+                    </span>
+                  </div>
+
+                  <span className={`ref-origin-verdict-tag ${
+                    hop.flagged ? "tone-warn" : "tone-ok"
+                  }`}>
+                    {hop.flagged ? "Flagged" : "Clean"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </DashboardPanel>
+
+        <DashboardPanel title="Correlation">
+          <div className="ref-origin-fields">
+            <div className="ref-origin-field">
+              <div className="ref-origin-field-text">
+                <span>Matching IP count</span>
+                <strong>{correlation.ip_count ?? 0}</strong>
+              </div>
+            </div>
+
+            <div className="ref-origin-field">
+              <div className="ref-origin-field-text">
+                <span>Matching ASN count</span>
+                <strong>{correlation.asn_count ?? 0}</strong>
+              </div>
+            </div>
+
+            <div className="ref-origin-field">
+              <div className="ref-origin-field-text">
+                <span>Recent related cases</span>
+                <strong>
+                  {(correlation.recent_case_ids || []).length}
+                </strong>
+              </div>
+            </div>
+          </div>
+        </DashboardPanel>
+
+        {originRisk.origin_breakdown && (
+          <DashboardPanel title="Risk signals">
+            <ul className="ref-signal-list">
+              {Object.entries(originRisk.origin_breakdown).map(([key, active]) => (
+                <li
+                  className={`ref-signal-item level-${active ? "high" : "low"}`}
+                  key={key}
+                >
+                  <span className="ref-signal-icon">
+                    {active ? <ShieldAlert size={14} /> : <ShieldCheck size={14} />}
+                  </span>
+                  <span>
+                    {key.replaceAll("_", " ")}
+                    {active ? " ? detected" : " ? not detected"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </DashboardPanel>
+        )}
+
+        {originTrace.geo_failures?.length > 0 && (
+          <DashboardPanel title="Geo lookup warnings">
+            <ul className="ref-signal-list">
+              {originTrace.geo_failures.map((failure, index) => (
+                <li className="ref-signal-item level-medium" key={`${failure.ip}-${index}`}>
+                  <span className="ref-signal-icon">
+                    <ShieldAlert size={14} />
+                  </span>
+                  <span>
+                    {failure.ip}: {failure.message || "Geolocation lookup failed"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </DashboardPanel>
+        )}
 
         <DashboardPanel title="Network signals">
           <ul className="ref-signal-list">

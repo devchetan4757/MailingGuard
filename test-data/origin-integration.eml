@@ -1,0 +1,12 @@
+From: "MailingGuard Test" <sender@example.com>
+To: user@example.com
+Reply-To: replies@example.net
+Subject: Origin Integration Test
+Date: Sun, 30 Aug 2026 20:00:00 +0530
+Message-ID: <origin-integration-001@example.com>
+MIME-Version: 1.0
+Received: from mail.google.example (8.8.8.8) by mx.receiver.example (198.51.100.10) with ESMTP; Sun, 30 Aug 2026 14:30:00 +0000
+Received: from internal-relay.example (10.0.0.5) by mail.google.example (8.8.8.8) with ESMTP; Sun, 30 Aug 2026 14:29:00 +0000
+Content-Type: text/plain; charset="utf-8"
+
+This is a MailingGuard Origin Analysis integration test.
