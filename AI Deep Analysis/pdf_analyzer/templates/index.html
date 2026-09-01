@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>PDF Threat Analyzer</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+</head>
+
+<body>
+
+<header>
+    <div class="nav">
+
+        <div class="brand">
+            <div class="logo">🛡️</div>
+
+            <div>
+                <h1>PDF Threat Analyzer</h1>
+                <p>Static Analysis & Detection Engine</p>
+            </div>
+        </div>
+
+        <div class="status">
+            <span class="status-dot"></span>
+            Analyzer Online
+        </div>
+
+    </div>
+</header>
+
+
+<main class="container">
+
+    <section class="hero">
+        <h2>Analyze suspicious PDF files</h2>
+
+        <p>
+            Detect risky words, suspicious paragraphs, URLs, clickable links,
+            embedded images, attachments and potentially suspicious PDF features.
+        </p>
+    </section>
+
+
+    <!-- UPLOAD -->
+
+    <section class="upload-box">
+
+        <div class="upload-icon">📄</div>
+
+        <h3>Upload a PDF file</h3>
+
+        <p>Select a PDF and start the analysis.</p>
+
+        <input
+            type="file"
+            id="pdfFile"
+            accept=".pdf,application/pdf"
+        >
+
+        <div class="upload-buttons">
+
+            <label for="pdfFile" class="file-label">
+                Choose PDF
+            </label>
+
+            <button
+                type="button"
+                class="analyze-btn"
+                id="analyzeBtn"
+            >
+                🔍 Analyze PDF
+            </button>
+
+        </div>
+
+        <div id="fileName" class="file-name">
+            No file selected
+        </div>
+
+        <div id="loading" class="loading">
+            ⏳ Analyzing PDF, please wait...
+        </div>
+
+    </section>
+
+
+    <!-- RESULTS -->
+
+    <section id="results">
+
+
+        <!-- RISK BANNER -->
+
+        <div class="risk-banner">
+
+            <div>
+
+                <h3 id="riskStatus">
+                    Analysis Complete
+                </h3>
+
+                <p id="riskDescription">
+                    PDF analysis results will appear here.
+                </p>
+
+            </div>
+
+
+            <div class="risk-score-box">
+
+                <div
+                    id="riskScore"
+                    class="risk-score"
+                >
+                    0
+                </div>
+
+                <div class="risk-label">
+                    INDICATOR SCORE / 10
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- SUMMARY -->
+
+        <div
+            id="summaryCards"
+            class="stats-grid"
+        ></div>
+
+
+        <!-- RISKY WORDS -->
+
+        <div class="section">
+
+            <div class="section-header">
+
+                <h3 class="section-title">
+                    🚨 Risky Words & Phrases
+                </h3>
+
+                <span
+                    id="riskyCount"
+                    class="badge"
+                >
+                    0 found
+                </span>
+
+            </div>
+
+            <div
+                id="riskyWords"
+                class="section-content"
+            ></div>
+
+        </div>
+
+
+        <!-- SUSPICIOUS TEXT -->
+
+        <div class="section">
+
+            <div class="section-header">
+
+                <h3 class="section-title">
+                    🔍 Suspicious Text Sections
+                </h3>
+
+                <span
+                    id="paragraphCount"
+                    class="badge"
+                >
+                    0 sections
+                </span>
+
+            </div>
+
+            <div
+                id="suspiciousParagraphs"
+                class="section-content"
+            ></div>
+
+        </div>
+
+
+        <!-- URLS -->
+
+        <div class="section">
+
+            <div class="section-header">
+
+                <h3 class="section-title">
+                    🔗 URLs Found
+                </h3>
+
+                <span
+                    id="urlCount"
+                    class="badge"
+                >
+                    0 URLs
+                </span>
+
+            </div>
+
+            <div
+                id="urls"
+                class="section-content"
+            ></div>
+
+        </div>
+
+
+        <!-- CLICKABLE LINKS -->
+
+        <div class="section">
+
+            <div class="section-header">
+
+                <h3 class="section-title">
+                    🔗 Clickable PDF Links
+                </h3>
+
+                <span
+                    id="clickableCount"
+                    class="badge"
+                >
+                    0 links
+                </span>
+
+            </div>
+
+            <div
+                id="clickableLinks"
+                class="section-content"
+            ></div>
+
+        </div>
+
+
+        <!-- IMAGES -->
+
+        <div class="section">
+
+            <div class="section-header">
+
+                <h3 class="section-title">
+                    🖼️ Images Found in PDF
+                </h3>
+
+                <span
+                    id="imageCount"
+                    class="badge"
+                >
+                    0 images
+                </span>
+
+            </div>
+
+            <div class="section-content">
+
+                <div
+                    id="images"
+                    class="images-grid"
+                ></div>
+
+            </div>
+
+        </div>
+
+
+        <!-- ATTACHMENTS -->
+
+        <div class="section">
+
+            <div class="section-header">
+
+                <h3 class="section-title">
+                    📎 Embedded Attachments
+                </h3>
+
+                <span
+                    id="attachmentCount"
+                    class="badge"
+                >
+                    0 attachments
+                </span>
+
+            </div>
+
+            <div
+                id="attachments"
+                class="section-content"
+            ></div>
+
+        </div>
+
+
+        <!-- PDF FEATURES -->
+
+        <div class="section">
+
+            <div class="section-header">
+
+                <h3 class="section-title">
+                    ⚠️ Suspicious PDF Features
+                </h3>
+
+                <span
+                    id="featureCount"
+                    class="badge"
+                >
+                    0 indicators
+                </span>
+
+            </div>
+
+            <div
+                id="suspicious"
+                class="section-content"
+            ></div>
+
+        </div>
+
+
+        <!-- METADATA -->
+
+        <div class="section">
+
+            <div class="section-header">
+
+                <h3 class="section-title">
+                    ℹ️ PDF Metadata
+                </h3>
+
+            </div>
+
+            <div
+                id="metadata"
+                class="section-content"
+            ></div>
+
+        </div>
+
+
+        <!-- PAGE STATS -->
+
+        <div class="section">
+
+            <div class="section-header">
+
+                <h3 class="section-title">
+                    📊 Page Statistics
+                </h3>
+
+            </div>
+
+            <div
+                id="pages"
+                class="section-content table-wrap"
+            ></div>
+
+        </div>
+
+    </section>
+
+</main>
+
+
+<script
+    src="{{ url_for('static', filename='script.js') }}"
+></script>
+
+</body>
+</html>
