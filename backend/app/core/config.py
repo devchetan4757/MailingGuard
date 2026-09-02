@@ -54,6 +54,21 @@ class Settings:
         "http://localhost:8000/api/integrations/gmail/callback",
     )
 
+    # Used by app/groq_summarizer.py to turn a deep-analysis analyzer's
+    # raw dict (crawler / whois / pdf / image) into a plain-language
+    # explanation for the "AI Deep Analysis" page. If unset, deep-analysis
+    # endpoints still return the raw analyzer result -- they just skip
+    # the "explanation" field instead of failing.
+    GROQ_API_KEY: str = os.getenv(
+        "GROQ_API_KEY",
+        "",
+    )
+
+    GROQ_MODEL: str = os.getenv(
+        "GROQ_MODEL",
+        "openai/gpt-oss-120b",
+    )
+
     @property
     def cors_origins(self) -> list[str]:
         extra = os.getenv(

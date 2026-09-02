@@ -429,6 +429,13 @@ async def run_analysis(
         f"case-{len(store.all_cases()) + 1}"
     )
 
+    # Kept so the per-attachment "deep analyze" button can re-extract the
+    # exact bytes for one attachment later without a re-upload round trip.
+    store.save_raw_eml(
+        case_id,
+        content,
+    )
+
     origin_analysis = await origin_service.analyze(
         parsed.get(
             "received_chain",

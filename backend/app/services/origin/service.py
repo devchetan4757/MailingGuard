@@ -10,6 +10,8 @@ only parsed in memory, never logged or persisted.
 from __future__ import annotations
 
 import logging
+import math
+from datetime import datetime
 
 from typing import Any, Dict, List, Optional
 
@@ -66,6 +68,7 @@ class OriginAnalysisService:
         """
         hops = parse_received_chain(raw)
         enriched = await self._enrich_hops(hops)
+        self._add_chain_diagnostics(enriched)
 
         public = [h for h in enriched if not h["internal"] and h["ip"]]
         first_public = public[0] if public else None
@@ -250,43 +253,55 @@ class OriginAnalysisService:
     def _build_trace(self, enriched, first_public, from_domain) -> Dict[str, Any]:
         geo_successes = [h for h in enriched if h.get("lat") is not None and h.get("lon") is not None]
         bounds = None
-        if len(geo_successes) >= 2:
+        if geo_successes:
             bounds = [
                 [min(h["lat"] for h in geo_successes), min(h["lon"] for h in geo_successes)],
                 [max(h["lat"] for h in geo_successes), max(h["lon"] for h in geo_successes)],
             ]
-        from_mx_country = None
-        if from_domain:
-            from_mx_country = self._mx_country_hint(from_domain)
+        from_mx_country = self._mx_country_hint(from_domain) if from_domain else None
 
         hops = []
         for h in enriched:
-            hop = {k: h[k] for k in (
+            hop = {k: h.get(k) for k in (
                 "ip", "hostname", "timestamp", "order", "internal", "warnings",
                 "lat", "lon", "city", "region", "country", "country_code",
                 "isp", "org", "asn", "asname", "reverse", "hosting", "proxy",
                 "mobile", "geo_error", "geo_message", "suspicious_flags",
-                "confidence", "cached_at",
+                "confidence", "cached_at", "blacklist", "skip_reason",
+                "chain_delay_seconds", "delay_label",
             )}
+            hop["suspicious_flags"] = list(h.get("suspicious_flags") or [])
             hop["blacklist"] = h.get("blacklist")
-            hop["flagged"] = bool(h["suspicious_flags"]) or bool(
-                h.get("blacklist") and h["blacklist"].get("listed")
-            ) or bool(h.get("hosting"))
             if hop["geo_error"] and hop["geo_message"]:
                 hop["partial_failure"] = hop["geo_message"]
-            if h.get("reverse"):
-                hop["reverse"] = h["reverse"]
-            # geo-from-domain mismatch (per hop, needs the From domain)
+            else:
+                hop["partial_failure"] = None
+
             if from_mx_country and hop.get("country_code"):
-                if hop["country_code"] != from_mx_country:
+                if hop["country_code"].upper() != from_mx_country.upper():
                     hop["suspicious_flags"].append({
                         "reason": "geo_from_mismatch",
                         "detail": f"hop country {hop['country_code']} differs from From-domain MX country {from_mx_country}",
                     })
-                    hop["flagged"] = True
+
+            hop["flagged"] = bool(hop["suspicious_flags"]) or bool(
+                hop.get("blacklist") and hop["blacklist"].get("listed")
+            ) or bool(hop.get("hosting")) or bool(hop.get("proxy"))
             hops.append(hop)
 
         summary = self._summarize(hops, first_public)
+        countries = [h.get("country_code") for h in hops if h.get("country_code")]
+        asns = [h.get("asn") for h in hops if h.get("asn")]
+        summary["unique_countries"] = len(set(countries))
+        summary["unique_asns"] = len(set(asns))
+        summary["country_path"] = list(dict.fromkeys(countries))
+        summary["asn_path"] = list(dict.fromkeys(asns))
+        summary["cross_border_hops"] = sum(1 for a,b in zip(countries, countries[1:]) if a != b)
+        summary["average_delay_seconds"] = self._average_delay(hops)
+        summary["max_delay_seconds"] = max((h.get("chain_delay_seconds") or 0 for h in hops), default=0)
+        summary["delayed_hops"] = sum(1 for h in hops if h.get("delay_label") in {"slow", "very_slow"})
+        summary["signal_count"] = sum(len(h.get("suspicious_flags") or []) for h in hops)
+
         return {
             "hops": hops,
             "summary": summary,
@@ -295,7 +310,7 @@ class OriginAnalysisService:
                 "method": "api-country-fields",
                 "city_radius_m": self.config.confidence.city_radius_km * 1000.0,
                 "country_radius_m": self.config.confidence.country_radius_km * 1000.0,
-                "note": "ip-api.com free tier provides city/country without accuracy metadata; conservative radii are used.",
+                "note": "IP geolocation is approximate; coordinates identify an IP's estimated network location, not a person's physical address.",
             },
             "from_domain": from_domain,
             "from_domain_mx_country": from_mx_country,
@@ -317,6 +332,33 @@ class OriginAnalysisService:
             return {"level": "country", "radius_m": self.config.confidence.country_radius_km * 1000.0,
                     "label": "Country-level (approximate)"}
         return {"level": "unknown", "radius_m": None, "label": "Unknown accuracy"}
+
+    def _add_chain_diagnostics(self, hops: List[Dict[str, Any]]) -> None:
+        """Add timeline/chain-quality signals without making extra network calls."""
+        previous = None
+        for hop in hops:
+            current = _parse_iso(hop.get("timestamp"))
+            delay = None
+            if previous is not None and current is not None:
+                delay = max(0.0, (current - previous).total_seconds())
+            hop["chain_delay_seconds"] = round(delay, 3) if delay is not None else None
+            if delay is None:
+                hop["delay_label"] = "unknown"
+            elif delay >= 3600:
+                hop["delay_label"] = "very_slow"
+                hop["suspicious_flags"].append({"reason": "delivery_delay", "detail": f"{round(delay / 3600, 2)}h between Received hops"})
+            elif delay >= 900:
+                hop["delay_label"] = "slow"
+                hop["suspicious_flags"].append({"reason": "delivery_delay", "detail": f"{round(delay / 60, 1)}m between Received hops"})
+            else:
+                hop["delay_label"] = "normal"
+            if current is not None:
+                previous = current
+
+    @staticmethod
+    def _average_delay(hops: List[Dict[str, Any]]) -> float:
+        values = [h["chain_delay_seconds"] for h in hops if h.get("chain_delay_seconds") is not None]
+        return round(sum(values) / len(values), 3) if values else 0.0
 
     def _summarize(self, hops: List[Dict[str, Any]], first_public) -> Dict[str, Any]:
         suspicious = [h for h in hops if h.get("flagged")]
@@ -374,3 +416,12 @@ def _hostnames_match(header_name: str, ptr_name: str) -> bool:
         if len(h_labels) >= take and h_labels[-take:] == p_labels[-take:]:
             return True
     return False
+
+
+def _parse_iso(value: Optional[str]):
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None

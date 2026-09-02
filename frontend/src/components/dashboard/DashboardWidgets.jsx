@@ -17,6 +17,9 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
 
 /* =========================================================
@@ -388,37 +391,18 @@ export function AlertVolumeChart({
 }
 
 /* =========================================================
-   BREAKDOWN LINE CHART
+   RISK SEVERITY AREA CHART
+   (the one trend chart kept on the dashboard — High risk vs
+   Low risk over the last 7 days)
    ========================================================= */
 
 export function BreakdownChart({
-  variant = "one",
   data = [],
 }) {
-  // variant "one" -> severity trend: High risk (red) vs Low risk (green)
-  // variant "two" -> review trend: Reviewed vs Pending
-  const seriesA =
-    variant === "one" ? "red" : "reviewed";
-  const seriesB =
-    variant === "one" ? "green" : "pending";
-
-  const colorA =
-    variant === "one" ? "#e0685f" : "#62b7bc";
-  const colorB =
-    variant === "one" ? "#e8c56b" : "#8d83b9";
-
-  const labelA =
-    variant === "one" ? "High risk" : "Reviewed";
-  const labelB =
-    variant === "one" ? "Low risk" : "Pending";
-
   const chartData =
     data.length > 0
       ? data
-      : [{ label: "", [seriesA]: 0, [seriesB]: 0 }];
-
-  const pill =
-    variant === "one" ? "RISK" : "REVIEW";
+      : [{ label: "", red: 0, green: 0 }];
 
   return (
     <div className="ref-line-chart">
@@ -429,25 +413,25 @@ export function BreakdownChart({
         >
           <defs>
             <linearGradient
-              id={`area-${variant}-a`}
+              id="area-risk-a"
               x1="0"
               y1="0"
               x2="0"
               y2="1"
             >
-              <stop offset="0%" stopColor={colorA} stopOpacity=".28" />
-              <stop offset="100%" stopColor={colorA} stopOpacity=".02" />
+              <stop offset="0%" stopColor="#e0685f" stopOpacity=".28" />
+              <stop offset="100%" stopColor="#e0685f" stopOpacity=".02" />
             </linearGradient>
 
             <linearGradient
-              id={`area-${variant}-b`}
+              id="area-risk-b"
               x1="0"
               y1="0"
               x2="0"
               y2="1"
             >
-              <stop offset="0%" stopColor={colorB} stopOpacity=".24" />
-              <stop offset="100%" stopColor={colorB} stopOpacity=".02" />
+              <stop offset="0%" stopColor="#e8c56b" stopOpacity=".24" />
+              <stop offset="100%" stopColor="#e8c56b" stopOpacity=".02" />
             </linearGradient>
           </defs>
 
@@ -462,203 +446,286 @@ export function BreakdownChart({
           <Tooltip
             formatter={(value, name) => [
               value,
-              name === seriesA ? labelA : labelB,
+              name === "red" ? "High risk" : "Low risk",
             ]}
             labelFormatter={(label) => label}
           />
 
           <Area
             type="monotone"
-            dataKey={seriesA}
-            stroke={colorA}
-            strokeWidth={2}
-            fill={`url(#area-${variant}-a)`}
-          />
-
-          <Area
-            type="monotone"
-            dataKey={seriesB}
-            stroke={colorB}
-            strokeWidth={2}
-            fill={`url(#area-${variant}-b)`}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
-
-      <div className="ref-chart-pill">
-        {pill}
-      </div>
-    </div>
-  );
-}
-
-/* =========================================================
-   OPERATIONS STACKED AREA CHART
-   ========================================================= */
-
-export function OperationsChart({
-  data = [],
-}) {
-  const chartData =
-    data.length > 0
-      ? data
-      : [{ label: "", red: 0, yellow: 0, green: 0 }];
-
-  return (
-    <div className="ref-stacked-wrap">
-      <div className="ref-legend">
-        <span>
-          <i className="legend-b" />
-          Threats
-        </span>
-
-        <span>
-          <i className="legend-c" />
-          Suspicious
-        </span>
-
-        <span>
-          <i className="legend-d" />
-          Safe
-        </span>
-      </div>
-
-      <ResponsiveContainer width="100%" height={190}>
-        <AreaChart
-          data={chartData}
-          margin={{ top: 8, right: 6, left: 6, bottom: 0 }}
-        >
-          <XAxis
-            dataKey="label"
-            tick={{ fontSize: 11, fill: "#9aa3a6" }}
-            axisLine={false}
-            tickLine={false}
-            interval="preserveStartEnd"
-          />
-
-          <Tooltip />
-
-          <Area
-            type="monotone"
             dataKey="red"
-            stackId="ops"
-            name="Threats"
             stroke="#e0685f"
-            fill="#e0685f"
-            fillOpacity={0.55}
-          />
-
-          <Area
-            type="monotone"
-            dataKey="yellow"
-            stackId="ops"
-            name="Suspicious"
-            stroke="#e8c56b"
-            fill="#e8c56b"
-            fillOpacity={0.5}
+            strokeWidth={2}
+            fill="url(#area-risk-a)"
           />
 
           <Area
             type="monotone"
             dataKey="green"
-            stackId="ops"
-            name="Safe"
-            stroke="#62b7bc"
-            fill="#62b7bc"
-            fillOpacity={0.45}
+            stroke="#e8c56b"
+            strokeWidth={2}
+            fill="url(#area-risk-b)"
           />
         </AreaChart>
       </ResponsiveContainer>
+
+      <div className="ref-chart-pill">
+        RISK
+      </div>
     </div>
   );
 }
 
 /* =========================================================
-   FLAGGED SECTIONS TREND (highlighted/important sections)
+   VERDICT DONUT CHART
+   (replaces the old stacked-area "Verdict Trend" chart —
+   same red/yellow/green totals, shown as a proportion
+   instead of a third near-identical area chart)
    ========================================================= */
 
-export function FlaggedSectionsChart({
+export function VerdictDonutChart({
   data = [],
 }) {
-  const chartData =
-    data.length > 0
-      ? data
-      : [{ label: "", high: 0, medium: 0, low: 0 }];
+  const totals = data.reduce(
+    (acc, day) => {
+      acc.threats += Number(day?.red || 0);
+      acc.suspicious += Number(day?.yellow || 0);
+      acc.safe += Number(day?.green || 0);
+      return acc;
+    },
+    { threats: 0, suspicious: 0, safe: 0 }
+  );
+
+  const grandTotal =
+    totals.threats + totals.suspicious + totals.safe;
+
+  const slices = [
+    { key: "threats", label: "Threats", value: totals.threats, color: "#e0685f" },
+    { key: "suspicious", label: "Suspicious", value: totals.suspicious, color: "#e8c56b" },
+    { key: "safe", label: "Safe", value: totals.safe, color: "#62b7bc" },
+  ];
+
+  if (!grandTotal) {
+    return (
+      <p className="ref-empty-inline">
+        No verdict data yet — analyze an email to see how it's classified.
+      </p>
+    );
+  }
 
   return (
-    <div className="ref-stacked-wrap">
-      <div className="ref-legend">
-        <span>
-          <i className="legend-b" />
-          Critical
-        </span>
+    <div className="ref-donut-wrap">
+      <div className="ref-donut-plot">
+        <ResponsiveContainer width="100%" height={180}>
+          <PieChart>
+            <Pie
+              data={slices}
+              dataKey="value"
+              nameKey="label"
+              innerRadius={52}
+              outerRadius={78}
+              paddingAngle={slices.filter((s) => s.value > 0).length > 1 ? 3 : 0}
+              stroke="none"
+            >
+              {slices.map((slice) => (
+                <Cell key={slice.key} fill={slice.color} />
+              ))}
+            </Pie>
 
-        <span>
-          <i className="legend-c" />
-          Moderate
-        </span>
+            <Tooltip
+              formatter={(value, name) => [value, name]}
+            />
+          </PieChart>
+        </ResponsiveContainer>
 
-        <span>
-          <i className="legend-d" />
-          Minor
-        </span>
+        <div className="ref-donut-center">
+          <strong>{grandTotal}</strong>
+          <span>emails</span>
+        </div>
       </div>
 
-      <ResponsiveContainer width="100%" height={190}>
-        <AreaChart
-          data={chartData}
-          margin={{ top: 8, right: 6, left: 6, bottom: 0 }}
+      <div className="ref-legend ref-donut-legend">
+        {slices.map((slice) => (
+          <span key={slice.key}>
+            <i style={{ background: slice.color }} />
+            {slice.label}
+            <b>{slice.value}</b>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   FLAGGED SECTIONS BREAKDOWN
+   (replaces the old stacked-area "Flagged Sections" chart —
+   same critical/moderate/minor totals, shown as a single
+   segmented bar instead of another near-identical area chart)
+   ========================================================= */
+
+export function FlaggedSectionsBreakdown({
+  data = [],
+}) {
+  const totals = data.reduce(
+    (acc, day) => {
+      acc.high += Number(day?.high || 0);
+      acc.medium += Number(day?.medium || 0);
+      acc.low += Number(day?.low || 0);
+      return acc;
+    },
+    { high: 0, medium: 0, low: 0 }
+  );
+
+  const grandTotal =
+    totals.high + totals.medium + totals.low;
+
+  const segments = [
+    { key: "high", label: "Critical", value: totals.high, color: "#e0685f" },
+    { key: "medium", label: "Moderate", value: totals.medium, color: "#e8c56b" },
+    { key: "low", label: "Minor", value: totals.low, color: "#62b7bc" },
+  ];
+
+  if (!grandTotal) {
+    return (
+      <p className="ref-empty-inline">
+        No flagged sections yet — analyze an email to see what's being
+        highlighted.
+      </p>
+    );
+  }
+
+  return (
+    <div className="ref-segment-breakdown">
+      <div className="ref-segment-track">
+        {segments.map(
+          (segment) =>
+            segment.value > 0 && (
+              <div
+                key={segment.key}
+                className="ref-segment-fill"
+                style={{
+                  width: `${(segment.value / grandTotal) * 100}%`,
+                  background: segment.color,
+                }}
+                title={`${segment.label}: ${segment.value}`}
+              />
+            )
+        )}
+      </div>
+
+      <div className="ref-segment-legend">
+        {segments.map((segment) => (
+          <div
+            className="ref-segment-legend-row"
+            key={segment.key}
+          >
+            <span
+              className="ref-segment-dot"
+              style={{ background: segment.color }}
+            />
+
+            <span className="ref-segment-name">
+              {segment.label}
+            </span>
+
+            <span className="ref-segment-value">
+              {segment.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   REVIEW PROGRESS RING
+   (replaces the old second "Review Progress Trend" area
+   chart — same reviewed/pending totals, shown as a progress
+   ring instead of a fourth near-identical area chart)
+   ========================================================= */
+
+export function ReviewProgressRing({
+  data = [],
+}) {
+  const totals = data.reduce(
+    (acc, day) => {
+      acc.reviewed += Number(day?.reviewed || 0);
+      acc.pending += Number(day?.pending || 0);
+      return acc;
+    },
+    { reviewed: 0, pending: 0 }
+  );
+
+  const total = totals.reviewed + totals.pending;
+  const pct = total
+    ? Math.round((totals.reviewed / total) * 100)
+    : 0;
+
+  const radius = 62;
+  const circumference = 2 * Math.PI * radius;
+  const offset =
+    circumference - (pct / 100) * circumference;
+
+  return (
+    <div className="ref-progress-ring-wrap">
+      <svg
+        viewBox="0 0 160 160"
+        className="ref-progress-ring"
+        aria-label={`${pct}% reviewed`}
+      >
+        <circle
+          cx="80"
+          cy="80"
+          r={radius}
+          className="ref-progress-ring-track"
+        />
+
+        <circle
+          cx="80"
+          cy="80"
+          r={radius}
+          className="ref-progress-ring-value"
+          style={{
+            strokeDasharray: circumference,
+            strokeDashoffset: offset,
+          }}
+          transform="rotate(-90 80 80)"
+        />
+
+        <text
+          x="80"
+          y="76"
+          textAnchor="middle"
+          className="ref-progress-ring-pct"
         >
-          <XAxis
-            dataKey="label"
-            tick={{ fontSize: 11, fill: "#9aa3a6" }}
-            axisLine={false}
-            tickLine={false}
-            interval="preserveStartEnd"
-          />
+          {pct}%
+        </text>
 
-          <Tooltip
-            formatter={(value, name) => [
-              value,
-              name === "high"
-                ? "Critical"
-                : name === "medium"
-                  ? "Moderate"
-                  : "Minor",
-            ]}
-          />
+        <text
+          x="80"
+          y="94"
+          textAnchor="middle"
+          className="ref-progress-ring-caption"
+        >
+          Reviewed
+        </text>
+      </svg>
 
-          <Area
-            type="monotone"
-            dataKey="high"
-            stackId="flags"
-            name="high"
-            stroke="#e0685f"
-            fill="#e0685f"
-            fillOpacity={0.55}
-          />
+      <div className="ref-progress-ring-legend">
+        <span>
+          <i style={{ background: "#5baeb4" }} />
+          Reviewed
+          <b>{totals.reviewed}</b>
+        </span>
 
-          <Area
-            type="monotone"
-            dataKey="medium"
-            stackId="flags"
-            name="medium"
-            stroke="#e8c56b"
-            fill="#e8c56b"
-            fillOpacity={0.5}
-          />
-
-          <Area
-            type="monotone"
-            dataKey="low"
-            stackId="flags"
-            name="low"
-            stroke="#62b7bc"
-            fill="#62b7bc"
-            fillOpacity={0.45}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
+        <span>
+          <i style={{ background: "#dbe2e4" }} />
+          Pending
+          <b>{totals.pending}</b>
+        </span>
+      </div>
     </div>
   );
 }
@@ -755,52 +822,176 @@ export function TrendAreaChart({
 }
 
 /* =========================================================
+   RANKED BAR LIST (shared by Top Sender Domains and
+   Threat Categories — same visual pattern, different data
+   and accent color)
+   ========================================================= */
+
+function RankedBarList({
+  data = [],
+  getLabel,
+  getValue,
+  icon: Icon,
+  emptyMessage,
+  variant = "default",
+}) {
+  if (!data.length) {
+    return (
+      <p className="ref-empty-inline">
+        {emptyMessage}
+      </p>
+    );
+  }
+
+  const max = Math.max(
+    ...data.map((item) => getValue(item)),
+    1
+  );
+
+  return (
+    <div className="ref-domain-list">
+      {data.map((item, index) => {
+        const value = getValue(item);
+
+        return (
+          <div
+            className="ref-domain-row"
+            key={`${getLabel(item)}-${index}`}
+          >
+            <div className="ref-domain-name">
+              <Icon size={13} strokeWidth={1.8} />
+              <span>{getLabel(item)}</span>
+            </div>
+
+            <div className="ref-domain-bar-track">
+              <div
+                className={`ref-domain-bar-fill ${
+                  variant === "risk" ? "is-risk" : ""
+                }`}
+                style={{
+                  width: `${(value / max) * 100}%`,
+                }}
+              />
+            </div>
+
+            <div className="ref-domain-count">
+              {value}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* =========================================================
    TOP SENDER DOMAINS
    ========================================================= */
 
 export function TopSenderDomains({
   data = [],
 }) {
-  if (!data.length) {
+  return (
+    <RankedBarList
+      data={data}
+      getLabel={(item) => item.domain}
+      getValue={(item) => item.count}
+      icon={Globe}
+      emptyMessage="No sender domains yet — analyze an email to see where alerts are coming from."
+    />
+  );
+}
+
+/* =========================================================
+   THREAT CATEGORIES (from real analyzer findings)
+   ========================================================= */
+
+export function ThreatCategoryBars({
+  data = [],
+}) {
+  return (
+    <RankedBarList
+      data={data.filter((item) => item.value > 0)}
+      getLabel={(item) => item.name}
+      getValue={(item) => item.value}
+      icon={AlertTriangle}
+      emptyMessage="No threat categories detected yet — analyze an email to see what's being flagged."
+      variant="risk"
+    />
+  );
+}
+
+/* =========================================================
+   CONTENT RISK (URLs / attachments / header findings —
+   real counts from the analyzer, with the suspicious share
+   highlighted)
+   ========================================================= */
+
+export function ContentRiskPanel({
+  data = [],
+}) {
+  const hasSignal = data.some(
+    (item) => item.total > 0
+  );
+
+  if (!hasSignal) {
     return (
       <p className="ref-empty-inline">
-        No sender domains yet — analyze an email to see where alerts are
-        coming from.
+        No content risk signals yet — analyze an email to see URL,
+        attachment and header findings.
       </p>
     );
   }
 
-  const max = Math.max(
-    ...data.map((item) => item.count),
-    1
-  );
-
   return (
-    <div className="ref-domain-list">
-      {data.map((item) => (
-        <div
-          className="ref-domain-row"
-          key={item.domain}
-        >
-          <div className="ref-domain-name">
-            <Globe size={13} strokeWidth={1.8} />
-            <span>{item.domain}</span>
-          </div>
+    <div className="ref-content-risk-list">
+      {data.map((item) => {
+        const pct = item.total
+          ? Math.round(
+              (item.suspicious / item.total) * 100
+            )
+          : 0;
 
-          <div className="ref-domain-bar-track">
-            <div
-              className="ref-domain-bar-fill"
-              style={{
-                width: `${(item.count / max) * 100}%`,
-              }}
-            />
-          </div>
+        return (
+          <div
+            className="ref-content-risk-row"
+            key={item.name}
+          >
+            <div className="ref-content-risk-top">
+              <span className="ref-content-risk-label">
+                {item.name}
+              </span>
 
-          <div className="ref-domain-count">
-            {item.count}
+              <span className="ref-content-risk-count">
+                <strong>{item.total}</strong> found
+                {item.suspicious > 0 && (
+                  <em>
+                    {" "}
+                    · {item.suspicious} suspicious
+                  </em>
+                )}
+              </span>
+            </div>
+
+            <div className="ref-content-risk-track">
+              <div
+                className="ref-content-risk-fill"
+                style={{
+                  width: `${item.total ? 100 : 0}%`,
+                }}
+              />
+              {item.suspicious > 0 && (
+                <div
+                  className="ref-content-risk-fill is-flagged"
+                  style={{
+                    width: `${pct}%`,
+                  }}
+                />
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

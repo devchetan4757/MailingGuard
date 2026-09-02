@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 
 
 class SuspiciousFlag(BaseModel):
-    reason: str  # hosting_vpn | blacklist | asn_reputation | rdns_mismatch | geo_from_mismatch
+    reason: str  # hosting_vpn | blacklist | asn_reputation | rdns_mismatch | geo_from_mismatch | delivery_delay
     detail: Optional[str] = None
 
 

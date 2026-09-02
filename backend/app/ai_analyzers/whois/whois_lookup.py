@@ -1,4 +1,10 @@
 # whois_lookup.py
+#
+# Backend-only version.
+# Original script only printed a report to the terminal.
+# `lookup_domain()` now returns a structured dict so an AI layer
+# (or any other caller) can consume the result programmatically.
+# A thin CLI wrapper is kept at the bottom for manual testing.
 
 import sys
 import socket
@@ -63,22 +69,13 @@ def get_dns_records(domain, record_type):
         return []
 
 
-def print_dns_records(domain):
-    print("\n[ DNS INFORMATION ]")
-    print("-" * 60)
-
+def get_all_dns_records(domain):
     record_types = ["A", "AAAA", "MX", "NS", "TXT"]
 
-    for record_type in record_types:
-        records = get_dns_records(domain, record_type)
-
-        print(f"\n{record_type} Records:")
-
-        if records:
-            for record in records:
-                print(f"  - {record}")
-        else:
-            print("  Not Available")
+    return {
+        record_type: get_dns_records(domain, record_type)
+        for record_type in record_types
+    }
 
 
 def analyze_domain(creation_date, expiration_date):
@@ -127,6 +124,11 @@ def analyze_domain(creation_date, expiration_date):
 
 
 def lookup_domain(domain):
+    """
+    Run a WHOIS + DNS + basic risk analysis on a domain and return
+    the result as a structured dict. This is the function the AI
+    layer should import and call directly.
+    """
 
     # Clean URL
     domain = domain.strip()
@@ -135,92 +137,63 @@ def lookup_domain(domain):
     domain = domain.replace("www.", "")
     domain = domain.split("/")[0]
 
-    print("\n" + "=" * 70)
-    print("                 DOMAIN WHOIS INTELLIGENCE REPORT")
-    print("=" * 70)
+    result = {
+        "domain": domain,
+        "scan_time": datetime.now(timezone.utc).isoformat(),
+        "ip_address": get_ip_address(domain),
+        "whois": {},
+        "warnings": [],
+        "dns_records": {},
+        "error": None
+    }
 
-    print(f"\nTarget Domain : {domain}")
-    print(f"Scan Time     : {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-
-    # NETWORK INFORMATION
-    print("\n[ NETWORK INFORMATION ]")
-    print("-" * 70)
-
-    ip_address = get_ip_address(domain)
-
-    print("IP Address    :", ip_address)
-
-    # WHOIS INFORMATION
     try:
-        result = whois.whois(domain)
+        whois_result = whois.whois(domain)
 
-        creation_date = result.creation_date
-        expiration_date = result.expiration_date
+        creation_date = whois_result.creation_date
+        expiration_date = whois_result.expiration_date
 
-        print("\n[ DOMAIN INFORMATION ]")
-        print("-" * 70)
+        name_servers = whois_result.name_servers
 
-        print("Domain Name   :", safe_value(result.domain_name))
-        print("Registrar     :", safe_value(result.registrar))
-        print("WHOIS Server  :", safe_value(result.whois_server))
-        print("Creation Date :", safe_value(creation_date))
-        print("Updated Date  :", safe_value(result.updated_date))
-        print("Expiry Date   :", safe_value(expiration_date))
-        print("Domain Age    :", get_domain_age(creation_date))
+        if name_servers and not isinstance(name_servers, (list, tuple, set)):
+            name_servers = [name_servers]
 
-        print("\n[ DOMAIN STATUS ]")
-        print("-" * 70)
+        result["whois"] = {
+            "domain_name": safe_value(whois_result.domain_name),
+            "registrar": safe_value(whois_result.registrar),
+            "whois_server": safe_value(whois_result.whois_server),
+            "creation_date": safe_value(creation_date),
+            "updated_date": safe_value(whois_result.updated_date),
+            "expiration_date": safe_value(expiration_date),
+            "domain_age": get_domain_age(creation_date),
+            "status": safe_value(whois_result.status),
+            "name_servers": list(name_servers) if name_servers else [],
+            "organization": safe_value(whois_result.org),
+            "country": safe_value(whois_result.country),
+            "state": safe_value(whois_result.state),
+            "city": safe_value(whois_result.city)
+        }
 
-        print("Status        :", safe_value(result.status))
-
-        print("\n[ NAME SERVERS ]")
-        print("-" * 70)
-
-        name_servers = result.name_servers
-
-        if name_servers:
-            if isinstance(name_servers, (list, tuple, set)):
-                for server in name_servers:
-                    print(" -", server)
-            else:
-                print(" -", name_servers)
-        else:
-            print("Not Available")
-
-        print("\n[ PUBLIC REGISTRANT INFORMATION ]")
-        print("-" * 70)
-
-        print("Organization  :", safe_value(result.org))
-        print("Country       :", safe_value(result.country))
-        print("State         :", safe_value(result.state))
-        print("City          :", safe_value(result.city))
-
-        # SECURITY OBSERVATIONS
-        warnings = analyze_domain(
+        result["warnings"] = analyze_domain(
             creation_date,
             expiration_date
         )
 
-        print("\n[ SECURITY OBSERVATIONS ]")
-        print("-" * 70)
-
-        if warnings:
-            for warning in warnings:
-                print("WARNING:", warning)
-        else:
-            print("No basic domain age or expiry warnings detected.")
-
     except Exception as error:
-        print("\n[ WHOIS LOOKUP ERROR ]")
-        print("-" * 70)
-        print(error)
+        result["error"] = str(error)
 
-    # DNS INFORMATION
-    print_dns_records(domain)
+    result["dns_records"] = get_all_dns_records(domain)
 
-    print("\n" + "=" * 70)
-    print("                    END OF REPORT")
-    print("=" * 70 + "\n")
+    return result
+
+
+# ============================================================
+# OPTIONAL CLI WRAPPER (manual testing only, not used by the AI layer)
+# ============================================================
+
+def _print_report(result):
+    import json
+    print(json.dumps(result, indent=2, default=str))
 
 
 if __name__ == "__main__":
@@ -230,4 +203,4 @@ if __name__ == "__main__":
         print("python whois_lookup.py example.com\n")
         sys.exit(1)
 
-    lookup_domain(sys.argv[1])
+    _print_report(lookup_domain(sys.argv[1]))

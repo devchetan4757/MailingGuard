@@ -1,5 +1,7 @@
 // src/components/dashboard/EmailParsingPanel.jsx
 
+import { useEffect, useState } from "react";
+
 import {
   Link2,
   Paperclip,
@@ -14,6 +16,8 @@ import {
   Globe2,
   Clock3,
   UserRound,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 import {
@@ -30,8 +34,50 @@ import {
 } from "recharts";
 
 import { DashboardPanel, DashboardStat } from "./DashboardWidgets";
+import { DeepAnalyzeTrigger, DeepAnalyzePanel } from "../results/DeepAnalysisResult";
+import { useDeepAnalysis } from "../../hooks/useDeepAnalysis";
+import { analyzeLink, analyzeCaseAttachment } from "../../api/deepAnalysisApi";
 
 const AUTH_KEYS = ["spf", "dkim", "dmarc"];
+
+// Mirrors backend/app/api/deep_analysis.py's ALLOWED_PDF_EXTENSIONS /
+// ALLOWED_IMAGE_EXTENSIONS -- used to decide whether an attachment row
+// even gets a "Deep analyze" button.
+const DEEP_SCANNABLE_EXTENSIONS = new Set([
+  ".pdf",
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".gif",
+  ".tif",
+  ".tiff",
+  ".bmp",
+  ".webp",
+  ".heic",
+]);
+
+function attachmentExtension(item) {
+  if (item.extension) return item.extension.toLowerCase();
+  const name = item.filename || "";
+  const dot = name.lastIndexOf(".");
+  return dot === -1 ? "" : name.slice(dot).toLowerCase();
+}
+
+const URLS_PER_PAGE = 6;
+
+// Splits a URL into its host (the part worth scanning first when
+// checking a link's trustworthiness) and the rest (path/query), so the
+// card can put the host on its own line instead of truncating the whole
+// string from the left.
+function splitUrl(rawUrl) {
+  try {
+    const parsed = new URL(rawUrl);
+    const rest = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    return { host: parsed.host, rest: rest === "/" ? "" : rest };
+  } catch {
+    return { host: rawUrl, rest: "" };
+  }
+}
 
 function ContentRiskChart({ data }) {
   const safeData = data.map((item) => ({
@@ -176,6 +222,13 @@ function EmptyBlock({ text }) {
 }
 
 export default function EmailParsingPanel({ currentCase }) {
+  const { state: deepState, run: runDeep, clear: clearDeep } = useDeepAnalysis();
+  const [urlPage, setUrlPage] = useState(1);
+
+  useEffect(() => {
+    setUrlPage(1);
+  }, [currentCase?.caseId]);
+
   if (!currentCase) {
     return (
       <DashboardPanel title="Email analysis">
@@ -188,6 +241,9 @@ export default function EmailParsingPanel({ currentCase }) {
   const metadata = analysis.metadata || {};
   const hc = currentCase.headerChecks || {};
   const urls = analysis.urls || [];
+  const urlPageCount = Math.max(1, Math.ceil(urls.length / URLS_PER_PAGE));
+  const urlPageSafe = Math.min(urlPage, urlPageCount);
+  const pagedUrls = urls.slice((urlPageSafe - 1) * URLS_PER_PAGE, urlPageSafe * URLS_PER_PAGE);
   const attachments = analysis.attachments || [];
   const headerFindings = analysis.header_findings || [];
 
@@ -279,13 +335,25 @@ export default function EmailParsingPanel({ currentCase }) {
             <EmptyBlock text="No attachments were found in this email." />
           ) : (
             <div className="ref-attachment-list">
-              {attachments.map((item, index) => (
-                <div className={`ref-attachment-row ${item.suspicious ? "is-suspicious" : ""}`} key={`${item.filename}-${index}`}>
-                  <div className="ref-attachment-icon"><Paperclip size={16} /></div>
-                  <div><strong>{item.filename || "Unnamed attachment"}</strong><span>{item.content_type || item.extension || "Unknown type"}{item.size ? ` · ${item.size}` : ""}</span></div>
-                  {item.suspicious && <b>FLAGGED</b>}
-                </div>
-              ))}
+              {attachments.map((item, index) => {
+                const key = `attachment-${index}`;
+                const scannable = DEEP_SCANNABLE_EXTENSIONS.has(attachmentExtension(item));
+                const entry = deepState[key];
+                const run = () => runDeep(key, () => analyzeCaseAttachment(currentCase.caseId, index));
+                const clear = () => clearDeep(key);
+
+                return (
+                  <div className={`ref-deep-card ${item.suspicious ? "is-suspicious" : ""}`} key={`${item.filename}-${index}`}>
+                    <div className="ref-attachment-row">
+                      <div className="ref-attachment-icon"><Paperclip size={16} /></div>
+                      <div><strong>{item.filename || "Unnamed attachment"}</strong><span>{item.content_type || item.extension || "Unknown type"}{item.size ? ` · ${item.size}` : ""}</span></div>
+                      {item.suspicious && <b>FLAGGED</b>}
+                      {scannable && <DeepAnalyzeTrigger label={item.filename || "attachment"} entry={entry} onRun={run} onClear={clear} />}
+                    </div>
+                    {scannable && <DeepAnalyzePanel entry={entry} onRun={run} onClear={clear} />}
+                  </div>
+                );
+              })}
             </div>
           )}
         </DashboardPanel>
@@ -295,13 +363,55 @@ export default function EmailParsingPanel({ currentCase }) {
         {urls.length === 0 ? (
           <EmptyBlock text="No links were extracted from this email." />
         ) : (
-          <div className="ref-url-list">
-            {urls.map((url, index) => (
-              <div className="ref-url-row" key={`${url}-${index}`}>
-                <div className="ref-url-icon"><Link2 size={14} /></div>
-                <span title={url}>{url}</span>
+          <div className="ref-url-panel-body">
+            <div className="ref-url-grid">
+              {pagedUrls.map((url, pagedIndex) => {
+                const index = (urlPageSafe - 1) * URLS_PER_PAGE + pagedIndex;
+                const key = `url-${index}`;
+                const entry = deepState[key];
+                const run = () => runDeep(key, () => analyzeLink(url));
+                const clear = () => clearDeep(key);
+                const { host, rest } = splitUrl(url);
+
+                return (
+                  <div className="ref-url-card" key={`${url}-${index}`}>
+                    <div className="ref-url-card-top">
+                      <div className="ref-url-icon"><Link2 size={14} /></div>
+                      <div className="ref-url-card-text">
+                        <strong title={host}>{host}</strong>
+                        {rest && <span title={rest}>{rest}</span>}
+                      </div>
+                    </div>
+
+                    <div className="ref-url-card-foot">
+                      <DeepAnalyzeTrigger label={url} entry={entry} onRun={run} onClear={clear} />
+                    </div>
+
+                    <DeepAnalyzePanel entry={entry} onRun={run} onClear={clear} />
+                  </div>
+                );
+              })}
+            </div>
+
+            {urlPageCount > 1 && (
+              <div className="ref-url-pager">
+                <button
+                  type="button"
+                  disabled={urlPageSafe === 1}
+                  onClick={() => setUrlPage((p) => Math.max(1, p - 1))}
+                >
+                  <ChevronLeft size={14} /> Previous
+                </button>
+                <span>Page {urlPageSafe} of {urlPageCount}</span>
+                <button
+                  type="button"
+                  disabled={urlPageSafe === urlPageCount}
+                  onClick={() => setUrlPage((p) => Math.min(urlPageCount, p + 1))}
+                >
+                  Next <ChevronRight size={14} />
+                </button>
               </div>
-            ))}
+            )}
           </div>
         )}
       </DashboardPanel>

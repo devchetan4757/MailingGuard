@@ -1407,6 +1407,196 @@ svg {
 
 
 /* =========================================================
+   VERDICT DONUT
+   ========================================================= */
+
+.ref-donut-wrap {
+  padding: 10px 16px 16px;
+}
+
+.ref-donut-plot {
+  position: relative;
+}
+
+.ref-donut-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+
+  transform: translate(-50%, -50%);
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  pointer-events: none;
+}
+
+.ref-donut-center strong {
+  color: #2f3a3e;
+  font-size: 20px;
+  line-height: 1.1;
+}
+
+.ref-donut-center span {
+  color: #8a9599;
+  font-size: 10px;
+}
+
+.ref-donut-legend {
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.ref-donut-legend span {
+  gap: 6px;
+}
+
+.ref-donut-legend b {
+  color: #2f3a3e;
+  font-weight: 700;
+}
+
+/* =========================================================
+   SEGMENTED BREAKDOWN BAR
+   ========================================================= */
+
+.ref-segment-breakdown {
+  padding: 18px 17px 19px;
+}
+
+.ref-segment-track {
+  display: flex;
+
+  height: 14px;
+
+  border-radius: 8px;
+  overflow: hidden;
+
+  background: #edf1f2;
+}
+
+.ref-segment-fill {
+  height: 100%;
+
+  min-width: 3px;
+}
+
+.ref-segment-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  margin-top: 16px;
+}
+
+.ref-segment-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  font-size: 12px;
+}
+
+.ref-segment-dot {
+  width: 9px;
+  height: 9px;
+
+  border-radius: 50%;
+
+  flex-shrink: 0;
+}
+
+.ref-segment-name {
+  flex: 1;
+
+  color: #3f4a4e;
+  font-weight: 600;
+}
+
+.ref-segment-value {
+  color: #647177;
+  font-weight: 600;
+}
+
+/* =========================================================
+   REVIEW PROGRESS RING
+   ========================================================= */
+
+.ref-progress-ring-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  padding: 14px 16px 18px;
+}
+
+.ref-progress-ring {
+  width: 150px;
+  height: 150px;
+}
+
+.ref-progress-ring-track,
+.ref-progress-ring-value {
+  fill: none;
+
+  stroke-width: 12;
+}
+
+.ref-progress-ring-track {
+  stroke: #edf1f2;
+}
+
+.ref-progress-ring-value {
+  stroke: #5baeb4;
+  stroke-linecap: round;
+
+  transition: stroke-dashoffset 0.3s ease;
+}
+
+.ref-progress-ring-pct {
+  fill: #2f3a3e;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.ref-progress-ring-caption {
+  fill: #8a9599;
+  font-size: 10px;
+}
+
+.ref-progress-ring-legend {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+
+  margin-top: 6px;
+
+  color: #4d585d;
+  font-size: 11px;
+}
+
+.ref-progress-ring-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ref-progress-ring-legend i {
+  width: 9px;
+  height: 9px;
+
+  display: inline-block;
+  border-radius: 50%;
+}
+
+.ref-progress-ring-legend b {
+  color: #2f3a3e;
+  font-weight: 700;
+}
+
+
+/* =========================================================
    ALERT QUEUE
    ========================================================= */
 
@@ -1431,6 +1621,32 @@ svg {
   color: #9aa3a7;
 
   font-size: 11px;
+}
+
+.ref-table-search svg {
+  flex-shrink: 0;
+  color: #9aa3a7;
+}
+
+.ref-table-search input {
+  flex: 1;
+  min-width: 0;
+
+  border: none;
+  outline: none;
+
+  background: transparent;
+  color: #3f4a4e;
+  font-size: 11px;
+  font-family: inherit;
+}
+
+.ref-table-search input::placeholder {
+  color: #9aa3a7;
+}
+
+.ref-table-search:focus-within {
+  border-color: #8fbfc4;
 }
 
 .ref-table-wrap {
@@ -1928,6 +2144,80 @@ svg {
   text-align: right;
 }
 
+.ref-domain-bar-fill.is-risk {
+  background: #e0685f;
+}
+
+/* =========================================================
+   CONTENT RISK
+   ========================================================= */
+
+.ref-content-risk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  padding: 16px 17px 19px;
+}
+
+.ref-content-risk-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ref-content-risk-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+
+  font-size: 12px;
+}
+
+.ref-content-risk-label {
+  color: #3f4a4e;
+  font-weight: 600;
+}
+
+.ref-content-risk-count {
+  color: #647177;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ref-content-risk-count em {
+  color: #d1574d;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.ref-content-risk-track {
+  position: relative;
+
+  height: 8px;
+
+  border-radius: 5px;
+
+  background: #edf1f2;
+  overflow: hidden;
+}
+
+.ref-content-risk-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+
+  border-radius: 5px;
+
+  background: #5baeb4;
+}
+
+.ref-content-risk-fill.is-flagged {
+  background: #e0685f;
+}
+
 /* =========================================================
    VISUAL EMAIL ANALYSIS
    ========================================================= */
@@ -2102,3 +2392,116 @@ svg {
     transform: scale(.72);
   }
 }
+
+/* ---------------------------------------------------------------------
+   Deep analysis — inline "Deep analyze" trigger + result panel that sits
+   directly on an existing URL/attachment card.
+   --------------------------------------------------------------------- */
+
+.ref-deep-card { display: flex; flex-direction: column; gap: 8px; }
+
+.ref-url-row, .ref-attachment-row { flex-wrap: wrap; }
+.ref-url-row span { flex: 1 1 auto; }
+.ref-attachment-row > div:nth-child(2) { flex: 1 1 160px; }
+
+.ref-deep-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  flex: 0 0 auto; margin-left: auto;
+  padding: 5px 10px; border-radius: 999px; border: 1px solid rgba(91,165,171,.35);
+  background: rgba(91,165,171,.08); color: #3d8b91;
+  font-size: 10px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.ref-deep-btn:hover { background: rgba(91,165,171,.16); }
+.ref-deep-btn.is-loading { color: #7c888d; border-color: #e4e9ea; background: #f6f8f8; cursor: default; }
+.ref-deep-btn.is-error { color: #ad584d; border-color: #efd8d4; background: #fff4f2; }
+.ref-deep-btn.is-done { color: #56a98a; border-color: rgba(86,169,138,.35); background: rgba(86,169,138,.08); }
+.ref-deep-spin { animation: ref-deep-spin 0.9s linear infinite; }
+@keyframes ref-deep-spin { to { transform: rotate(360deg); } }
+
+.ref-deep-panel {
+  border: 1px solid #e4e9ea; border-radius: 9px; background: #fbfcfc;
+  padding: 12px 13px; margin: 0 0 0 0;
+}
+.ref-deep-panel.is-error { border-color: #efd8d4; background: #fff9f8; }
+
+.ref-deep-panel-head {
+  display: flex; align-items: center; gap: 7px; margin-bottom: 8px;
+  color: #3d8b91; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+}
+.ref-deep-panel.is-error .ref-deep-panel-head { color: #ad584d; }
+.ref-deep-panel-head span { flex: 1 1 auto; }
+.ref-deep-panel-head button {
+  border: none; background: none; color: #8b969b; font-size: 10px; font-weight: 600;
+  cursor: pointer; text-transform: none; letter-spacing: 0; padding: 2px 4px;
+}
+.ref-deep-panel-head button:hover { color: #405158; }
+
+.ref-deep-explanation { margin: 0 0 10px; color: #3b4b51; font-size: 11.5px; line-height: 1.5; }
+.ref-deep-explanation-muted { display: flex; align-items: center; gap: 5px; color: #8b969b; font-style: italic; }
+
+.ref-deep-raw { display: flex; flex-direction: column; gap: 5px; }
+.ref-deep-raw-row {
+  display: flex; justify-content: space-between; gap: 10px;
+  font-size: 10.5px; padding: 4px 0; border-bottom: 1px dashed #e9edee;
+}
+.ref-deep-raw-row span { color: #899499; text-transform: capitalize; }
+.ref-deep-raw-row strong { color: #405158; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
+.ref-deep-raw-toggle {
+  display: inline-flex; align-items: center; gap: 4px; align-self: flex-start;
+  border: none; background: none; color: #5ba5ab; font-size: 10px; font-weight: 600;
+  cursor: pointer; padding: 4px 0 0;
+}
+.ref-deep-raw-json {
+  margin: 8px 0 0; padding: 10px; background: #12262a; color: #cfe7e8; border-radius: 7px;
+  font-size: 10px; line-height: 1.5; overflow-x: auto; max-height: 240px; overflow-y: auto;
+}
+
+/* ---------------------------------------------------------------------
+   Extracted links — card grid + pagination.
+   Host is the primary scan target for a security reviewer, so it sits on
+   its own line at full weight; the path is secondary and quieter below it.
+   --------------------------------------------------------------------- */
+
+.ref-url-panel-body { padding: 4px 17px 17px; display: flex; flex-direction: column; gap: 14px; }
+
+.ref-url-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.ref-url-card {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 12px 13px 12px 12px;
+  background: #fbfcfc;
+  border: 1px solid #e4e9ea;
+  border-left: 3px solid #7fbcc1;
+  border-radius: 4px 8px 8px 4px;
+}
+
+.ref-url-card-top { display: flex; align-items: flex-start; gap: 9px; min-width: 0; }
+
+.ref-url-card-text { min-width: 0; flex: 1 1 auto; }
+.ref-url-card-text strong {
+  display: block; color: #2c3e44; font-size: 12px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ref-url-card-text span {
+  display: block; margin-top: 3px; color: #8b969b; font-size: 10px; line-height: 1.4;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.ref-url-card-foot { display: flex; justify-content: flex-end; }
+
+.ref-url-pager {
+  display: flex; align-items: center; justify-content: center; gap: 16px;
+  padding-top: 4px;
+}
+.ref-url-pager span { color: #7c888d; font-size: 10.5px; }
+.ref-url-pager button {
+  display: inline-flex; align-items: center; gap: 4px;
+  border: 1px solid #d9e3e5; background: #fff; color: #3d8b91;
+  padding: 5px 11px; border-radius: 6px; font-size: 10.5px; font-weight: 600; cursor: pointer;
+}
+.ref-url-pager button:hover:not(:disabled) { background: #f2f8f8; }
+.ref-url-pager button:disabled { color: #c3ccce; border-color: #ecefef; cursor: default; }

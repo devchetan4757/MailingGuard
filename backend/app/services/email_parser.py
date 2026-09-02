@@ -70,7 +70,7 @@ def extract_urls(text):
         return []
 
     matches = re.findall(
-        r"https?://[^\s<>'\"]+",
+        r"https?://[^\s<>'\"()]+",
         text,
     )
 
@@ -151,6 +151,53 @@ def analyze_attachment(
         "suspicious": False,
         "reason": None,
     }
+
+
+def extract_attachment_bytes(content, index):
+    """
+    Re-walk a raw .eml (given as bytes) and return the decoded payload for
+    the attachment at `index`, using the exact same walk order/condition
+    (`disposition == "attachment" or filename`) as parse_email() uses to
+    build the `attachments` list -- so index N here always lines up with
+    index N of that list.
+
+    Returns (filename, content_type, payload_bytes) or None if there's no
+    attachment at that index.
+
+    Used by the "deep analyze this attachment" button on an already-parsed
+    case: the API layer doesn't retain raw attachment bytes in the stored
+    case record (only filename/size/etc.), so this re-derives them on
+    demand from the raw .eml bytes kept in app.services.store.
+    """
+
+    message = BytesParser(
+        policy=policy.default
+    ).parsebytes(content)
+
+    if not message.is_multipart():
+        return None
+
+    position = 0
+
+    for part in message.walk():
+
+        if part.is_multipart():
+            continue
+
+        content_type = part.get_content_type()
+        disposition = part.get_content_disposition()
+        filename = part.get_filename()
+
+        if disposition == "attachment" or filename:
+
+            if position == index:
+                payload = part.get_payload(decode=True) or b""
+                decoded_filename = decode_mime_header(filename)
+                return decoded_filename, content_type, payload
+
+            position += 1
+
+    return None
 
 
 # ---------------------------------------------------------------------------

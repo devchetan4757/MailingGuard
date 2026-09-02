@@ -123,6 +123,7 @@ class RiskConfig:
     weight_rdns_mismatch: int = 5       # header hostname != PTR record
     weight_geo_from_mismatch: int = 5   # hop country != From-domain MX country
     weight_geo_failure: int = 5         # geolocation unavailable (uncertainty)
+    weight_delivery_delay: int = 5      # unusually long Received-hop delay
     max_contribution: int = 40          # cap so origin never dominates the score
 
 
@@ -202,6 +203,7 @@ def load_config(env=None) -> Config:
         weight_rdns_mismatch=_env_int(get("ORIGIN_RISK_WEIGHT_RDNS_MISMATCH"), 5),
         weight_geo_from_mismatch=_env_int(get("ORIGIN_RISK_WEIGHT_GEO_FROM_MISMATCH"), 5),
         weight_geo_failure=_env_int(get("ORIGIN_RISK_WEIGHT_GEO_FAILURE"), 5),
+        weight_delivery_delay=_env_int(get("ORIGIN_RISK_WEIGHT_DELIVERY_DELAY"), 5),
         max_contribution=_env_int(get("ORIGIN_RISK_MAX_CONTRIBUTION"), 40),
     )
     correlation = CorrelationConfig(

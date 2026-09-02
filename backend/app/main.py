@@ -18,6 +18,7 @@ from app.api.cases import router as cases_router
 from app.api.report import router as report_router
 from app.api.origin import router as origin_router
 from app.api.integrations.gmail import router as gmail_router
+from app.api.deep_analysis import router as deep_analysis_router
 
 
 # ---------------------------------------------------------------------------
@@ -121,6 +122,19 @@ app.include_router(
     prefix="/api",
     tags=[
         "Origin Intelligence",
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# AI DEEP ANALYSIS API (links / sender domain / PDF & image attachments)
+# ---------------------------------------------------------------------------
+
+app.include_router(
+    deep_analysis_router,
+    prefix="/api",
+    tags=[
+        "AI Deep Analysis",
     ],
 )
 

@@ -1,11 +1,19 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useCases } from "../hooks/useCases";
 import { useGmailOverview } from "../hooks/useGmailOverview";
+import { useAnalyzeGmailMessage } from "../hooks/useAnalyzeGmailMessage";
 import { useCaseContext } from "../context/CaseContext";
 
 import DashboardSections from "../components/dashboard/DashboardSections";
+
+
+// How many of the most recently loaded Gmail messages to silently
+// analyze on first load so the dashboard's charts/cards have real
+// data instead of empty states. Kept small since each one is a
+// full backend analyze call.
+const AUTO_ANALYZE_COUNT = 5;
 
 
 /* =========================================================
@@ -754,11 +762,24 @@ export default function DashboardPage() {
     status: gmailStatus,
     dashboard: gmailDashboard,
     connected: gmailConnected,
+    isLoading: gmailIsLoading,
     isSyncing: gmailSyncing,
     loadProgress: gmailLoadProgress,
     error: gmailError,
     sync: syncGmailNow,
   } = useGmailOverview();
+
+  const { analyze: analyzeGmailMessageFor } =
+    useAnalyzeGmailMessage();
+
+  // Declared up here (rather than next to the effect that fills
+  // them) because dashboardCases below needs to read
+  // autoAnalyzedCases, and hooks/consts must be initialized before
+  // the code that references them runs.
+  const autoAnalyzeRanRef = useRef(false);
+  const [autoAnalyzeStatus, setAutoAnalyzeStatus] =
+    useState(null); // { done, total } while running, else null
+  const [autoAnalyzedCases, setAutoAnalyzedCases] = useState([]);
 
 
   /* =======================================================
@@ -815,31 +836,42 @@ export default function DashboardPage() {
 
   /*
    * The freshly analyzed case can contain the complete dashboard
-   * response before the case-list endpoint has refreshed.
+   * response before the case-list endpoint has refreshed. And
+   * GET /cases itself never carries `headerChecks`/`dashboard`/
+   * `analysis` at all (see the auto-analyze note below) — only a
+   * direct analyze response does.
    *
-   * Include it immediately so the dashboard reacts to analysis
-   * without waiting for another page load.
+   * So: start from the list, then layer the full-detail versions
+   * (currentCase + anything the background auto-analyze produced)
+   * on top by caseId, instead of just appending currentCase.
    */
 
   const dashboardCases = useMemo(() => {
-    if (!currentCase?.caseId) {
-      return cases;
+    const merged = new Map();
+
+    cases.forEach((item) => {
+      if (item?.caseId) merged.set(item.caseId, item);
+    });
+
+    autoAnalyzedCases.forEach((item) => {
+      if (!item?.caseId) return;
+      merged.set(item.caseId, {
+        ...merged.get(item.caseId),
+        ...item,
+      });
+    });
+
+    if (currentCase?.caseId) {
+      merged.set(currentCase.caseId, {
+        ...merged.get(currentCase.caseId),
+        ...currentCase,
+      });
     }
 
-    const exists = cases.some(
-      (item) =>
-        item?.caseId ===
-        currentCase.caseId
-    );
-
-    return exists
-      ? cases
-      : [
-          ...cases,
-          currentCase,
-        ];
+    return Array.from(merged.values());
   }, [
     cases,
+    autoAnalyzedCases,
     currentCase,
   ]);
 
@@ -864,6 +896,94 @@ export default function DashboardPage() {
         gmailDashboard,
       ]
     );
+
+
+  /* =======================================================
+     AUTO-ANALYZE (background, data-only)
+
+     If Gmail is connected but none of the loaded cases carry
+     real analyzer output yet, silently run a handful of the
+     most recently loaded mailbox messages through the same
+     analyze pipeline as a manual upload. This is purely to
+     seed the dashboard's charts/cards with real data — it
+     never sets `currentCase` and never navigates away.
+
+     (autoAnalyzeRanRef / autoAnalyzeStatus / autoAnalyzedCases
+     are declared up near the top of the component — see the
+     comment there — since dashboardCases needs to read
+     autoAnalyzedCases before this effect runs.)
+     ======================================================= */
+
+  useEffect(() => {
+    if (autoAnalyzeRanRef.current) return;
+    if (isLoading || gmailIsLoading) return;
+    if (!gmailConnected) return;
+
+    const messages = gmailDashboard?.messages || [];
+    if (!messages.length) return;
+
+    // Only seed once — check for real analyzer detail
+    // (`.dashboard`/`.analysis`/`.headerChecks`), not just any case
+    // existing. Pre-existing cases from GET /cases are lightweight
+    // (riskScore/severity/reviewed/analyzedAt only — see the note
+    // above), so a case can exist in history while still carrying
+    // none of the detail these three cards need. dashboardCases
+    // also folds in autoAnalyzedCases/currentCase, so once a real
+    // seed has actually landed this correctly stops re-running.
+    const hasRealDetail = dashboardCases.some(
+      (item) =>
+        item?.dashboard ||
+        item?.analysis ||
+        item?.headerChecks
+    );
+    if (hasRealDetail) return;
+
+    autoAnalyzeRanRef.current = true;
+
+    const targets = messages.slice(0, AUTO_ANALYZE_COUNT);
+
+    (async () => {
+      setAutoAnalyzeStatus({
+        done: 0,
+        total: targets.length,
+      });
+
+      const results = [];
+
+      for (let i = 0; i < targets.length; i++) {
+        try {
+          const result = await analyzeGmailMessageFor(
+            targets[i].id
+          );
+          if (result) results.push(result);
+        } catch {
+          // Skip messages that fail to analyze (e.g. malformed
+          // MIME) — this is best-effort background seeding, not
+          // a user-facing action.
+        }
+
+        setAutoAnalyzeStatus({
+          done: i + 1,
+          total: targets.length,
+        });
+      }
+
+      if (results.length) {
+        setAutoAnalyzedCases(results);
+      }
+
+      await refetch();
+      setAutoAnalyzeStatus(null);
+    })();
+  }, [
+    isLoading,
+    gmailIsLoading,
+    gmailConnected,
+    gmailDashboard,
+    dashboardCases,
+    analyzeGmailMessageFor,
+    refetch,
+  ]);
 
 
   /* =======================================================
@@ -1244,6 +1364,10 @@ export default function DashboardPage() {
 
           gmailError={
             gmailError
+          }
+
+          autoAnalyzeStatus={
+            autoAnalyzeStatus
           }
 
           onSyncGmail={

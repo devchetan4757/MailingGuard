@@ -13,6 +13,7 @@ Exact weightings (all configurable via ``ORIGIN_RISK_WEIGHT_*``):
      +5  header hostname does not match the PTR record (rDNS mismatch)
      +5  hop country != MX country of the From domain (geo inconsistency)
      +5  geolocation failed for at least one public hop (uncertainty)
+    +5  a Received hop shows an unusually long delivery delay
     cap  max contribution: 40 points
 
 No other risk source is modified.
@@ -47,6 +48,7 @@ def origin_risk_contribution(
         "rdns_mismatch": False,
         "geo_from_mismatch": False,
         "geo_failure": False,
+        "delivery_delay": False,
     }
 
     for hop in hops:
@@ -64,6 +66,8 @@ def origin_risk_contribution(
                     breakdown["geo_from_mismatch"] = True
         if hop.get("geo_error"):
             breakdown["geo_failure"] = True
+        if hop.get("delay_label") in {"slow", "very_slow"}:
+            breakdown["delivery_delay"] = True
 
     if breakdown["blacklist"]:
         points += w.weight_blacklist
@@ -77,6 +81,8 @@ def origin_risk_contribution(
         points += w.weight_geo_from_mismatch
     if breakdown["geo_failure"]:
         points += w.weight_geo_failure
+    if breakdown["delivery_delay"]:
+        points += getattr(w, "weight_delivery_delay", 5)
 
     capped = min(points, w.max_contribution)
     return {

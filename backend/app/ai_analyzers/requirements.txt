@@ -1,9 +1,4 @@
 # Core backend logic only (no Flask/UI dependencies needed)
-#
-# NOTE: these are now also listed in backend/requirements.txt, since
-# crawler.py and whois_lookup.py run in-process inside the main FastAPI
-# app (app/dispatcher.py), not just as standalone scripts. Keep both
-# files in sync if you add a new analyzer dependency here.
 
 # crawler
 requests
@@ -19,4 +14,3 @@ dnspython
 # image-analyzer
 # Note: also requires the `exiftool` binary installed on the system
 # (e.g. `apt-get install libimage-exiftool-perl`), it is not a pip package.
-groq

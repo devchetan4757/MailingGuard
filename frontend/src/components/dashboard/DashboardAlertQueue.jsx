@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { DashboardPanel } from "./DashboardWidgets";
 import { Search } from "lucide-react";
 
@@ -6,6 +7,26 @@ export default function DashboardAlertQueue({
   totalAlerts,
   navigate,
 }) {
+  const [search, setSearch] = useState("");
+
+  const filteredCases = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    if (!query) return recentCases;
+
+    return recentCases.filter((item) => {
+      const id = String(item?.id || item?.caseId || "");
+      const sender = String(item?.sender || item?.from || "");
+      const subject = String(item?.subject || item?.title || "");
+
+      return (
+        id.toLowerCase().includes(query) ||
+        sender.toLowerCase().includes(query) ||
+        subject.toLowerCase().includes(query)
+      );
+    });
+  }, [recentCases, search]);
+
   return (
     <DashboardPanel
       title={
@@ -18,7 +39,14 @@ export default function DashboardAlertQueue({
       right={
         <div className="ref-table-search">
           <Search size={15} />
-          <span>Search</span>
+
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search sender, subject, ID…"
+            aria-label="Search alert queue"
+          />
         </div>
       }
     >
@@ -36,8 +64,8 @@ export default function DashboardAlertQueue({
           </thead>
 
           <tbody>
-            {recentCases.length > 0 ? (
-              recentCases.map((item, index) => {
+            {filteredCases.length > 0 ? (
+              filteredCases.map((item, index) => {
                 const status =
                   item?.severity === "red"
                     ? "Open"
@@ -109,7 +137,9 @@ export default function DashboardAlertQueue({
                   colSpan="6"
                   className="ref-empty"
                 >
-                  No email alerts found.
+                  {search.trim()
+                    ? "No alerts match your search."
+                    : "No email alerts found."}
                 </td>
               </tr>
             )}
@@ -119,10 +149,9 @@ export default function DashboardAlertQueue({
 
       <div className="ref-queue-footer">
         <span>
-          {totalAlerts ||
-            recentCases.length}{" "}
-          alerts shown from current
-          analysis data
+          {search.trim()
+            ? `${filteredCases.length} of ${totalAlerts || recentCases.length} alerts match “${search.trim()}”`
+            : `${totalAlerts || recentCases.length} alerts shown from current analysis data`}
         </span>
 
         <button

@@ -1,7 +1,5 @@
 import {
   AlertTriangle,
-  CalendarDays,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CircleHelp,
@@ -14,13 +12,15 @@ import {
 import {
   DashboardPanel,
   DashboardStat,
-  RiskGauge,
   AlertVolumeChart,
   BreakdownChart,
-  OperationsChart,
-  AuthHealthChips,
-  FlaggedSectionsChart,
+  VerdictDonutChart,
+  FlaggedSectionsBreakdown,
+  ReviewProgressRing,
   TopSenderDomains,
+  ThreatCategoryBars,
+  ContentRiskPanel,
+  AuthHealthChips,
 } from "./DashboardWidgets";
 
 import DashboardAlertQueue from "./DashboardAlertQueue";
@@ -35,6 +35,7 @@ export default function DashboardSections({
   authBreakdown,
   highlightTrend,
   topDomains,
+  analyzerDashboard,
 
   totalFlags,
   todayCount,
@@ -56,8 +57,15 @@ export default function DashboardSections({
   gmailSyncing,
   gmailLoadProgress,
   gmailError,
+  autoAnalyzeStatus,
   onSyncGmail,
 }) {
+  const threatCategories =
+    analyzerDashboard?.threatCategories || [];
+
+  const contentRisk =
+    analyzerDashboard?.contentRisk || [];
+
   const gmailIsChunkLoading = Boolean(gmailLoadProgress);
 
   const gmailPillLabel = gmailConnected
@@ -164,6 +172,14 @@ export default function DashboardSections({
         </p>
       )}
 
+      {autoAnalyzeStatus && (
+        <p className="ref-history-note">
+          Analyzing {autoAnalyzeStatus.done}/
+          {autoAnalyzeStatus.total} recent emails to populate your
+          dashboard…
+        </p>
+      )}
+
       {/* =================================================
           GMAIL LIVE LOAD STATUS
           ================================================= */}
@@ -207,30 +223,6 @@ export default function DashboardSections({
 
 
       {/* =================================================
-          TOOLBAR
-          ================================================= */}
-
-      <div className="reference-toolbar">
-        <div className="ref-search">
-          <span>
-            Alert Queue
-          </span>
-        </div>
-
-        <button
-          type="button"
-          className="ref-date-picker"
-        >
-          <CalendarDays size={16} />
-
-          Sept 30
-
-          <ChevronDown size={15} />
-        </button>
-      </div>
-
-
-      {/* =================================================
           STATISTICS
           ================================================= */}
 
@@ -271,45 +263,6 @@ export default function DashboardSections({
 
       <div className="ref-grid-three">
 
-        {/* Authentication */}
-
-        <DashboardPanel
-          title="Authentication Health"
-          right={
-            <span className="ref-panel-number">
-              {authBreakdown.ranChecks ||
-                cases.length}
-            </span>
-          }
-        >
-          <div className="ref-firewall-number">
-            {cases.length
-              ? `${cases.length} emails scanned`
-              : "0 emails scanned"}
-          </div>
-
-          <RiskGauge
-            value={
-              authBreakdown.ranChecks
-                ? authBreakdown.passRate
-                : 92
-            }
-            caption="SPF / DKIM / DMARC pass rate"
-          />
-
-          <span className="ref-history-note">
-            {authBreakdown.totals.spf.fail +
-              authBreakdown.totals.dkim.fail +
-              authBreakdown.totals.dmarc.fail}{" "}
-            failed checks
-          </span>
-
-          <AuthHealthChips
-            totals={authBreakdown.totals}
-          />
-        </DashboardPanel>
-
-
         {/* Alert Volume */}
 
         <DashboardPanel
@@ -326,15 +279,34 @@ export default function DashboardSections({
         </DashboardPanel>
 
 
-        {/* Breakdown */}
+        {/* Content Risk — real URL / attachment / header
+            finding counts from the analyzer */}
 
         <DashboardPanel
-          title="Breakdown"
+          title="Content Risk"
         >
-          <BreakdownChart
-            variant="one"
-            data={breakdownData}
+          <ContentRiskPanel
+            data={contentRisk}
           />
+        </DashboardPanel>
+
+
+        {/* Authentication Health — real SPF/DKIM/DMARC
+            pass rates, no placeholder numbers */}
+
+        <DashboardPanel
+          title="Authentication Health"
+        >
+          <AuthHealthChips
+            totals={authBreakdown.totals}
+          />
+
+          <span className="ref-history-note">
+            {authBreakdown.totals.spf.fail +
+              authBreakdown.totals.dkim.fail +
+              authBreakdown.totals.dmarc.fail}{" "}
+            failed checks
+          </span>
         </DashboardPanel>
 
       </div>
@@ -347,19 +319,18 @@ export default function DashboardSections({
       <div className="ref-grid-two">
 
         <DashboardPanel
-          title="Breakdown"
+          title="Risk Severity Trend"
         >
           <BreakdownChart
-            variant="two"
             data={breakdownData}
           />
         </DashboardPanel>
 
 
         <DashboardPanel
-          title="Verdict Trend"
+          title="Verdict Breakdown"
         >
-          <OperationsChart
+          <VerdictDonutChart
             data={breakdownData}
           />
         </DashboardPanel>
@@ -381,7 +352,7 @@ export default function DashboardSections({
             </span>
           }
         >
-          <FlaggedSectionsChart
+          <FlaggedSectionsBreakdown
             data={highlightTrend}
           />
         </DashboardPanel>
@@ -392,6 +363,37 @@ export default function DashboardSections({
         >
           <TopSenderDomains
             data={topDomains}
+          />
+        </DashboardPanel>
+
+      </div>
+
+
+      {/* =================================================
+          FOURTH CHART ROW
+          ================================================= */}
+
+      <div className="ref-grid-two">
+
+        <DashboardPanel
+          title="Threat Categories"
+          right={
+            <span className="ref-panel-number">
+              {threatCategories.length}
+            </span>
+          }
+        >
+          <ThreatCategoryBars
+            data={threatCategories}
+          />
+        </DashboardPanel>
+
+
+        <DashboardPanel
+          title="Review Progress"
+        >
+          <ReviewProgressRing
+            data={breakdownData}
           />
         </DashboardPanel>
 
