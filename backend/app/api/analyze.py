@@ -456,6 +456,62 @@ async def run_analysis(
 
     raw_origin = origin_analysis.get("origin") or {}
 
+    # ---------------------------------------------------------------
+    # Origin IP fallback
+    #
+    # The parser can recover an origin IP from X-Originating-IP even
+    # when the email contains no Received headers. Origin Analysis
+    # normally geolocates Received-chain hops, so explicitly resolve
+    # this fallback IP when the legacy origin has no coordinates.
+    # ---------------------------------------------------------------
+
+    fallback_origin_ip = parsed.get("origin_ip")
+
+    if (
+        fallback_origin_ip
+        and not raw_origin.get("lat")
+        and not raw_origin.get("lon")
+    ):
+        try:
+            fallback_trace = await origin_service.analyze(
+                [
+                    f"Received: from [{fallback_origin_ip}] by mailguard.local"
+                ],
+                case_id=case_id,
+                from_domain=parsed.get("from_domain"),
+                base_risk=int(
+                    score.get(
+                        "riskScore",
+                        0,
+                    )
+                    or 0
+                ),
+            )
+
+            fallback_origin = (
+                fallback_trace.get("origin")
+                or {}
+            )
+
+            if fallback_origin:
+                raw_origin = {
+                    **fallback_origin,
+                    "ip": (
+                        fallback_origin.get("ip")
+                        or fallback_origin_ip
+                    ),
+                }
+
+                # Preserve the original trace when the real email has
+                # Received hops; otherwise expose the fallback trace.
+                if not origin_analysis.get("origin_trace", {}).get("hops"):
+                    origin_analysis = fallback_trace
+
+        except Exception:
+            # Origin enrichment is best-effort; the main email analysis
+            # must continue even if fallback geolocation is unavailable.
+            pass
+
     # Preserve the existing MailingGuard Origin contract.
     origin = {
         "ip": raw_origin.get("ip")

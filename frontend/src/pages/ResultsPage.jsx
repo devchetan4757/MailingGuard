@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   XCircle,
   AlertTriangle,
+  ShieldAlert,
   X,
 } from "lucide-react";
 
@@ -84,6 +85,10 @@ export default function ResultsPage() {
   const origin = currentCase.origin || {};
   const related = currentCase.relatedCases || [];
   const checkKeys = ["spf", "dkim", "dmarc"];
+
+  const threatIntel = currentCase.threatIntel || null;
+  const tiVerdict = threatIntel?.overallVerdict || threatIntel?.verdict || "unknown";
+  const tiSignals = threatIntel?.signals || threatIntel || {};
 
   return (
     <main className="reference-dashboard">
