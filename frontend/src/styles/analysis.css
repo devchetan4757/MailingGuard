@@ -1,8 +1,8 @@
-/* src/styles/analysis.css
+﻿/* src/styles/analysis.css
    Case-analysis screens only: AI Deep Analysis, Origin Analysis
    (incl. TraceMap), and the Results page (verdict + related cases +
    modal). Split out of global.css purely to keep that file from growing
-   unbounded — these three pages share a lot of markup/classes with each
+   unbounded â€” these three pages share a lot of markup/classes with each
    other but not with the rest of the dashboard, so they live together
    here. Anything reused by the dashboard shell itself (panels, gauge,
    charts, stat cards) stays in global.css.
@@ -788,7 +788,7 @@
 }
 
 /* ---------------------------------------------------------
-   TraceMap — origin lat/lng visualization
+   TraceMap â€” origin lat/lng visualization
    --------------------------------------------------------- */
 
 .ref-tracemap {
@@ -1213,3 +1213,70 @@
 .ref-modal-close:hover {
   background: #e3e9eb;
 }
+
+/* Leaflet TraceMap pulse enhancement */
+.ref-tracemap-canvas .leaflet-container {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+}
+
+/* MailingGuard exact-location beacon
+   This is an HTML Leaflet marker, not an SVG path. */
+.trace-map-beacon-icon {
+  background: transparent !important;
+  border: 0 !important;
+  pointer-events: none !important;
+}
+
+.trace-map-beacon {
+  position: relative;
+  display: block;
+  width: 40px;
+  height: 40px;
+}
+
+.trace-map-beacon__ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  margin-top: -7px;
+  border: 3px solid #e5484d;
+  border-radius: 50%;
+  box-sizing: border-box;
+  animation: mailingguard-location-beacon 1.35s ease-out infinite;
+}
+
+.trace-map-beacon__dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: #e5484d;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.95);
+}
+
+@keyframes mailingguard-location-beacon {
+  0% {
+    transform: scale(0.75);
+    opacity: 1;
+  }
+
+  70% {
+    transform: scale(2.2);
+    opacity: 0.2;
+  }
+
+  100% {
+    transform: scale(2.55);
+    opacity: 0;
+  }
+}
+

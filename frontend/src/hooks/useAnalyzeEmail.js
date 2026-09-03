@@ -1,6 +1,6 @@
 /**
  * Epic 1 owner (or whoever owns UploadPage) — wraps emailApi.analyzeEmail
- * with loading/error state so UploadBox.jsx doesn't manage fetch details.
+ * with loading/error state for the email analysis flow.
  */
 
 import { useState } from "react";

@@ -8,16 +8,37 @@ def fetch_html(url, timeout=10):
         "User-Agent": "Mozilla/5.0 (compatible; SimpleCrawler/1.0)"
     }
 
-    response = requests.get(
-        url,
-        headers=headers,
-        timeout=timeout
-    )
+    try:
+        response = requests.get(
+            url,
+            headers=headers,
+            timeout=timeout
+        )
 
-    response.raise_for_status()
+        response.raise_for_status()
+        return response.text
 
-    return response.text
+    except requests.exceptions.ConnectionError:
+        raise RuntimeError(
+            "Unable to reach this URL. The domain could not be resolved "
+            "or the connection was refused."
+        )
 
+    except requests.exceptions.Timeout:
+        raise RuntimeError(
+            "Unable to reach this URL. The request timed out."
+        )
+
+    except requests.exceptions.HTTPError as error:
+        status = error.response.status_code if error.response else "unknown"
+        raise RuntimeError(
+            f"The website returned HTTP status {status}."
+        )
+
+    except requests.exceptions.RequestException as error:
+        raise RuntimeError(
+            f"Unable to fetch the URL: {error}"
+        )
 
 def get_title(soup):
     tag = soup.find("title")

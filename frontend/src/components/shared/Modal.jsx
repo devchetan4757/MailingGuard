@@ -1,7 +1,6 @@
 /**
  * Shared modal shell — integrator owned.
  * PROPS CONTRACT: { isOpen: boolean, onClose: () => void, children: ReactNode }
- * Used by RelatedCaseSummaryModal.jsx - don't build a second modal pattern.
  */
 
 export default function Modal({ isOpen, onClose, children }) {
