@@ -1,10 +1,8 @@
-﻿import {
-  CircleMarker,
+import {
   MapContainer,
   Marker,
   Polyline,
   TileLayer,
-  Tooltip,
   useMap,
 } from "react-leaflet";
 import { divIcon } from "leaflet";
@@ -143,8 +141,6 @@ export default function TraceMap({
           )}
 
           {plottedHops.map((hop, index) => {
-            const hopFlagged = Boolean(hop.flagged);
-
             return (
               <div key={`${hop.ip || "hop"}-${index}`}>
                 <Marker
