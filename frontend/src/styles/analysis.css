@@ -1,4 +1,4 @@
-﻿/* src/styles/analysis.css
+/* src/styles/analysis.css
    Case-analysis screens only: AI Deep Analysis, Origin Analysis
    (incl. TraceMap), and the Results page (verdict + related cases +
    modal). Split out of global.css purely to keep that file from growing
@@ -1277,6 +1277,1108 @@
   100% {
     transform: scale(2.55);
     opacity: 0;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   "Full report" trigger on an Extracted links card — matches the site's
+   normal pill-button language (same shape/colors as the URL pager
+   buttons) instead of the old unstyled/transparent link.
+   --------------------------------------------------------------------- */
+
+.ref-deep-expand-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+
+  padding: 5px 11px;
+
+  border: 1px solid #d9e3e5;
+  border-radius: 999px;
+
+  background: #ffffff;
+  color: #3d8b91;
+
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.ref-deep-expand-btn:hover {
+  background: #f2f8f8;
+  border-color: #b9d3d5;
+}
+
+.ref-deep-expand-btn:focus-visible {
+  outline: 2px solid #55aeb5;
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------
+   Deep Analysis Report page — the full routed page a "Full report"
+   button opens, replacing the old small transparent Modal popup.
+   --------------------------------------------------------------------- */
+
+.ref-report-head {
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.ref-report-head-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  min-width: 0;
+}
+
+.ref-report-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+
+  margin-top: 6px;
+
+  border: 1px solid #d2dadd;
+  border-radius: 10px;
+
+  background: #ffffff;
+  color: #3a6f74;
+  cursor: pointer;
+
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.ref-report-back:hover {
+  background: #f2f8f8;
+  border-color: #b9d3d5;
+}
+
+.ref-report-title {
+  font-size: clamp(26px, 3vw, 38px);
+}
+
+.ref-report-target {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+
+  margin-top: 4px;
+  max-width: 62ch;
+
+  color: #69757a;
+
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.ref-report-target span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ref-report-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+
+  padding: 9px 16px;
+
+  border: 0;
+  border-radius: 10px;
+
+  background: #55aeb5;
+  color: #ffffff;
+  cursor: pointer;
+
+  font-size: 12.5px;
+  font-weight: 700;
+
+  transition: background 0.15s ease;
+}
+
+.ref-report-refresh:hover:not(:disabled) {
+  background: #429da5;
+}
+
+.ref-report-refresh:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.ref-report-preview-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+
+  padding: 9px 16px;
+
+  border: 1px solid #bcdbde;
+  border-radius: 10px;
+
+  background: #ffffff;
+  color: #3a6f74;
+  cursor: pointer;
+
+  font-size: 12.5px;
+  font-weight: 700;
+
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.ref-report-preview-btn:hover {
+  background: #f2f8f8;
+  border-color: #8fc3c7;
+}
+
+.ref-report-verdict {
+  margin-bottom: 0;
+}
+
+.ref-report-flag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+
+  margin-top: 12px;
+}
+
+.ref-report-flag-chip {
+  padding: 5px 10px;
+
+  border: 1px solid #efd8d4;
+  border-radius: 999px;
+
+  background: #fff4f2;
+  color: #ad584d;
+
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Source verdict donut */
+
+.ref-report-donut {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+
+  padding: 6px 4px;
+}
+
+.ref-report-donut-chart {
+  position: relative;
+  width: 148px;
+  height: 148px;
+  flex: 0 0 auto;
+}
+
+.ref-report-donut-center {
+  position: absolute;
+  inset: 0;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  pointer-events: none;
+}
+
+.ref-report-donut-center strong {
+  color: #263238;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.ref-report-donut-center span {
+  margin-top: 2px;
+
+  color: #8b969b;
+  font-size: 10px;
+}
+
+.ref-report-donut-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  min-width: 0;
+}
+
+.ref-report-donut-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  font-size: 12px;
+  color: #3b4b51;
+}
+
+.ref-report-donut-legend-row i {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  flex: 0 0 auto;
+}
+
+.ref-report-donut-legend-row span {
+  flex: 1 1 auto;
+}
+
+.ref-report-donut-legend-row b {
+  color: #263238;
+}
+
+/* Risk by category (radar + per-category breakdown) */
+
+.ref-category-full-panel {
+  margin-bottom: 18px;
+}
+
+.ref-category-panel {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+
+  padding: 6px 17px 17px;
+}
+
+.ref-category-chart-wrap {
+  flex: 1.1 1 0;
+  min-width: 0;
+}
+
+.ref-category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.ref-category-card {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+
+  padding: 10px 12px;
+
+  border: 1px solid #e4e9ea;
+  border-radius: 8px;
+
+  background: #fbfcfc;
+}
+
+.ref-category-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #263238;
+}
+
+.ref-category-card-head b {
+  color: #8b969b;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ref-category-bar {
+  height: 6px;
+
+  border-radius: 999px;
+
+  background: #e9edee;
+  overflow: hidden;
+}
+
+.ref-category-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+
+  transition: width 0.25s ease;
+}
+
+.ref-category-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+
+  font-size: 11px;
+  color: #8b969b;
+}
+
+.ref-category-flag-note {
+  color: #ad584d;
+  font-weight: 700;
+}
+
+.ref-category-clean-note {
+  color: #4c8f75;
+  font-weight: 700;
+}
+
+@media (max-width: 720px) {
+  .ref-category-panel {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* Every-check source cards */
+
+.ref-report-source-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+
+  padding: 4px 17px 17px;
+}
+
+.ref-report-source-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  padding: 13px 14px;
+
+  border: 1px solid #e4e9ea;
+  border-left: 3px solid #d7dcdd;
+  border-radius: 5px 9px 9px 5px;
+
+  background: #fbfcfc;
+}
+
+.ref-report-source-card.is-pending {
+  opacity: 0.6;
+}
+
+.ref-report-source-card.is-clean {
+  border-left-color: #56a98a;
+}
+
+.ref-report-source-card.is-flagged {
+  border-color: #efd8d4;
+  border-left-color: #c0574c;
+  background: #fff9f8;
+}
+
+.ref-report-source-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+
+.ref-report-source-title {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ref-report-source-title strong {
+  color: #263238;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.ref-report-source-title span {
+  margin-top: 1px;
+
+  color: #a5aeb2;
+  font-size: 10px;
+  text-transform: capitalize;
+}
+
+.ref-report-source-reason {
+  color: #a5aeb2;
+  font-size: 10px;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.ref-report-source-tag {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+
+  border-radius: 999px;
+
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.ref-report-source-tag.is-clean {
+  background: rgba(86, 169, 138, 0.12);
+  color: #3f8a6d;
+}
+
+.ref-report-source-tag.is-flagged {
+  background: rgba(173, 88, 77, 0.12);
+  color: #ad584d;
+}
+
+.ref-report-pending-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  margin: 0;
+
+  color: #8b969b;
+  font-size: 11px;
+}
+
+.ref-report-error-detail {
+  margin: 0;
+
+  color: #ad584d;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.ref-report-field-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+
+  border-top: 1px dashed #e9edee;
+  padding-top: 8px;
+}
+
+.ref-report-field {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+
+  padding: 5px 0;
+  border-bottom: 1px dashed #e9edee;
+}
+
+.ref-report-field:last-child {
+  border-bottom: 0;
+}
+
+.ref-report-field > span {
+  flex: 0 0 auto;
+  max-width: 45%;
+
+  color: #899499;
+
+  font-size: 10.5px;
+  text-transform: capitalize;
+}
+
+.ref-report-field > strong {
+  flex: 1 1 auto;
+  min-width: 0;
+
+  color: #405158;
+
+  font-size: 11px;
+  font-weight: 600;
+  text-align: right;
+  overflow-wrap: break-word;
+}
+
+.ref-report-subgrid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  text-align: left;
+}
+
+.ref-report-subgrid .ref-report-field {
+  padding: 2px 0;
+  border-bottom: 0;
+}
+
+.ref-report-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.ref-report-chip {
+  padding: 2px 7px;
+
+  border: 1px solid #e4e9ea;
+  border-radius: 999px;
+
+  background: #ffffff;
+  color: #405158;
+
+  font-size: 9.5px;
+  font-weight: 600;
+}
+
+.ref-report-empty {
+  color: #c3ccce;
+}
+
+.ref-report-empty-note {
+  margin: 0;
+  padding-top: 8px;
+  border-top: 1px dashed #e9edee;
+
+  color: #a5aeb2;
+  font-size: 10.5px;
+  font-style: italic;
+}
+
+/* ---------------------------------------------------------------------
+   AI summary card — the model's plain-language read on a full report,
+   styled distinctly from the raw check cards so it reads like an
+   answer, not another data row. Violet is the app-wide "the model said
+   so" accent (see ref-verdict-eyebrow), reused here at card scale.
+   --------------------------------------------------------------------- */
+
+.ref-ai-summary {
+  display: flex;
+  gap: 14px;
+
+  margin: 14px 0 18px;
+  padding: 18px 20px;
+
+  border: 1px solid rgba(139, 111, 255, 0.22);
+  border-radius: 12px;
+
+  background: linear-gradient(135deg, rgba(139, 111, 255, 0.07), rgba(85, 174, 181, 0.05));
+  box-shadow: 0 2px 10px rgba(139, 111, 255, 0.06);
+}
+
+.ref-ai-summary.is-red {
+  border-color: rgba(193, 87, 76, 0.28);
+  background: linear-gradient(135deg, rgba(193, 87, 76, 0.07), rgba(139, 111, 255, 0.05));
+}
+
+.ref-ai-summary.is-yellow {
+  border-color: rgba(184, 135, 58, 0.28);
+  background: linear-gradient(135deg, rgba(184, 135, 58, 0.08), rgba(139, 111, 255, 0.05));
+}
+
+.ref-ai-summary.is-green {
+  border-color: rgba(86, 169, 138, 0.28);
+  background: linear-gradient(135deg, rgba(86, 169, 138, 0.07), rgba(139, 111, 255, 0.05));
+}
+
+.ref-ai-summary-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+
+  border-radius: 10px;
+
+  background: rgba(139, 111, 255, 0.14);
+  color: #8b6fff;
+}
+
+.ref-ai-summary-body {
+  min-width: 0;
+}
+
+.ref-ai-summary-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  margin-bottom: 6px;
+}
+
+.ref-ai-summary-eyebrow span:first-child {
+  color: #8b6fff;
+
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.ref-ai-summary-score {
+  padding: 2px 8px;
+
+  border-radius: 999px;
+
+  background: rgba(139, 111, 255, 0.12);
+  color: #6f52e0;
+
+  font-size: 9.5px;
+  font-weight: 700;
+}
+
+.ref-ai-summary-text {
+  margin: 0;
+  max-width: 76ch;
+
+  color: #33424a;
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+
+.ref-ai-summary-text-muted {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+
+  color: #8b969b;
+  font-style: italic;
+}
+
+/* ---------------------------------------------------------------------
+   "More details" — the second disclosure tier on a check card, between
+   the always-visible highlight facts and the full raw JSON dump. Same
+   compact key/value language as the highlight grid, but tolerant of
+   arrays and nested objects via short chip/summary previews instead of
+   printing them in full.
+   --------------------------------------------------------------------- */
+
+.ref-report-detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+
+  margin-top: -2px;
+  padding-top: 2px;
+}
+
+.ref-report-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.ref-report-detail-row > span:first-child {
+  flex: 0 0 auto;
+  max-width: 40%;
+
+  color: #899499;
+
+  font-size: 10.5px;
+  text-transform: capitalize;
+}
+
+.ref-report-detail-note,
+.ref-report-detail-text {
+  flex: 1 1 auto;
+  min-width: 0;
+
+  color: #62727a;
+  font-size: 10.5px;
+  font-style: italic;
+  text-align: right;
+  overflow-wrap: break-word;
+}
+
+.ref-report-chip.is-more {
+  border-style: dashed;
+
+  background: #eef3f3;
+  color: #7c8a8d;
+  font-style: normal;
+}
+
+.ref-deep-raw-toggle-muted {
+  color: #a5aeb2;
+  font-weight: 500;
+}
+
+@media (max-width: 720px) {
+  .ref-report-donut {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .ref-report-field {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .ref-report-field > strong {
+    text-align: left;
+  }
+
+  .ref-report-chip-row {
+    justify-content: flex-start;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   Page Preview / Source page — opened from the "Preview page" button on
+   a Deep Analysis Report. Shows the server-fetched HTML as a sandboxed
+   rendered preview, as raw source with line numbers, and (new) as an
+   editable buffer so a user can paste/tweak markup and render it too,
+   without needing a real fetch behind it.
+   --------------------------------------------------------------------- */
+
+.ref-source-safety-note {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+
+  margin: 0 0 16px;
+  padding: 11px 16px;
+
+  border: 1px solid #bcdbde;
+  border-radius: 10px;
+
+  background: rgba(85, 174, 181, 0.08);
+  color: #3a6f74;
+
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.ref-source-safety-note svg {
+  flex: 0 0 auto;
+  color: #55aeb5;
+}
+
+.ref-source-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+
+  margin: 0 0 12px;
+}
+
+.ref-source-status-chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.ref-source-status-chip.is-ok {
+  background: rgba(46, 230, 168, 0.14);
+  color: #2b8f6f;
+}
+
+.ref-source-status-chip.is-bad {
+  background: rgba(255, 77, 109, 0.13);
+  color: #b1493d;
+}
+
+.ref-source-redirect-note {
+  overflow: hidden;
+  max-width: 44ch;
+
+  color: #69757a;
+  font-size: 11.5px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ref-source-size-note {
+  margin-left: auto;
+
+  color: #69757a;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tabs */
+
+.ref-source-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  margin: 0 0 14px;
+  border-bottom: 1px solid #d2dadd;
+}
+
+.ref-source-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  margin-bottom: -1px;
+  padding: 10px 14px;
+
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: #69757a;
+  cursor: pointer;
+
+  font-size: 12.5px;
+  font-weight: 600;
+
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.ref-source-tab:hover {
+  color: #3a6f74;
+}
+
+.ref-source-tab.is-active {
+  border-bottom-color: #55aeb5;
+  color: #3a6f74;
+}
+
+.ref-source-tab-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  margin-left: auto;
+  padding-bottom: 8px;
+}
+
+.ref-source-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+
+  padding: 6px 11px;
+
+  border: 1px solid #d2dadd;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #55656b;
+  cursor: pointer;
+
+  font-size: 11.5px;
+  font-weight: 600;
+
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.ref-source-tab-btn:hover {
+  border-color: #b9d3d5;
+  background: #f2f8f8;
+  color: #3a6f74;
+}
+
+/* Panel body shared by preview / source / editor */
+
+.ref-source-panel {
+  display: flex;
+  flex-direction: column;
+
+  padding: 0;
+  min-height: 460px;
+}
+
+.ref-source-iframe {
+  width: 100%;
+  height: 70vh;
+  min-height: 460px;
+
+  border: 0;
+  border-radius: 0 0 9px 9px;
+  background: #ffffff;
+}
+
+/* Raw source viewer — dark code-reader panel, same dark palette as the
+   raw-JSON viewer elsewhere in Deep Analysis so "code you shouldn't run"
+   always reads the same way across the app. */
+
+.ref-source-code {
+  display: flex;
+  align-items: stretch;
+
+  max-height: 70vh;
+  overflow: auto;
+
+  border-radius: 0 0 9px 9px;
+  background: #12262a;
+
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.ref-source-code-gutter {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+
+  padding: 14px 12px;
+  border-right: 1px solid #1d3438;
+  background: #0e1f22;
+
+  color: #4f7378;
+  text-align: right;
+  user-select: none;
+}
+
+.ref-source-code-gutter span {
+  display: block;
+}
+
+.ref-source-code-body {
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 14px 18px;
+
+  color: #cfe7e8;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Load-your-own-HTML editor tab */
+
+.ref-source-editor {
+  display: flex;
+  flex-direction: column;
+  min-height: 460px;
+}
+
+.ref-source-editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+
+  padding: 10px 14px;
+
+  border-bottom: 1px solid #d2dadd;
+  border-radius: 10px 10px 0 0;
+  background: #f7f9fa;
+}
+
+.ref-source-editor-hint {
+  flex: 1 1 auto;
+
+  color: #69757a;
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.ref-source-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ref-source-render-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  padding: 7px 14px;
+
+  border: 0;
+  border-radius: 8px;
+  background: #55aeb5;
+  color: #ffffff;
+  cursor: pointer;
+
+  font-size: 11.5px;
+  font-weight: 700;
+
+  transition: background 0.15s ease;
+}
+
+.ref-source-render-btn:hover {
+  background: #429da5;
+}
+
+.ref-source-editor-textarea {
+  flex: 1 1 auto;
+  min-height: 460px;
+  resize: vertical;
+
+  padding: 14px 18px;
+
+  border: 0;
+  border-radius: 0 0 9px 9px;
+  background: #12262a;
+  color: #cfe7e8;
+
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.ref-source-editor-textarea:focus {
+  outline: none;
+}
+
+.ref-source-editor-textarea::placeholder {
+  color: #4f7378;
+}
+
+/* Banner shown over the rendered-preview tab when it's showing pasted/
+   edited HTML rather than the actually-fetched page, so it's never
+   mistaken for what the server really received. */
+
+.ref-source-preview-flag {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  padding: 8px 14px;
+
+  border-bottom: 1px solid #f0e1c2;
+  border-radius: 10px 10px 0 0;
+  background: #fff9ee;
+  color: #8a742f;
+
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.ref-source-preview-flag svg {
+  flex: 0 0 auto;
+  color: #b8873a;
+}
+
+.ref-source-preview-flag button {
+  margin-left: auto;
+
+  border: 0;
+  background: none;
+  color: #8a742f;
+  cursor: pointer;
+
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+@media (max-width: 720px) {
+  .ref-source-tabs {
+    flex-wrap: wrap;
+  }
+
+  .ref-source-tab-actions {
+    margin-left: 0;
+    padding-bottom: 10px;
+    width: 100%;
+  }
+
+  .ref-source-size-note {
+    margin-left: 0;
   }
 }
 

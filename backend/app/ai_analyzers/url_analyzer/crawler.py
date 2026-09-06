@@ -40,6 +40,49 @@ def fetch_html(url, timeout=10):
             f"Unable to fetch the URL: {error}"
         )
 
+
+def fetch_page_source(url, timeout=10):
+    """
+    Like fetch_html(), but for the "Preview page" button on the frontend
+    rather than the full crawl check: also returns the final (post-
+    redirect) URL and HTTP status code, and deliberately does NOT call
+    raise_for_status() -- a 404 or 500 page still has HTML worth previewing,
+    so only actual connection/timeout failures are treated as errors here.
+    """
+    headers = {
+        "User-Agent": "Mozilla/5.0 (compatible; SimpleCrawler/1.0)"
+    }
+
+    try:
+        response = requests.get(
+            url,
+            headers=headers,
+            timeout=timeout,
+            allow_redirects=True,
+        )
+
+        return {
+            "html": response.text,
+            "final_url": response.url,
+            "status_code": response.status_code,
+        }
+
+    except requests.exceptions.ConnectionError:
+        raise RuntimeError(
+            "Unable to reach this URL. The domain could not be resolved "
+            "or the connection was refused."
+        )
+
+    except requests.exceptions.Timeout:
+        raise RuntimeError(
+            "Unable to reach this URL. The request timed out."
+        )
+
+    except requests.exceptions.RequestException as error:
+        raise RuntimeError(
+            f"Unable to fetch the URL: {error}"
+        )
+
 def get_title(soup):
     tag = soup.find("title")
     return tag.get_text(strip=True) if tag else None

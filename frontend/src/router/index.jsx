@@ -6,6 +6,8 @@ import OriginAnalysisPage from "../pages/OriginAnalysisPage";
 import ReportsPage from "../pages/ReportsPage";
 import ResultsPage from "../pages/ResultsPage";
 import GmailPage from "../pages/GmailPage";
+import DeepAnalysisReportPage from "../pages/DeepAnalysisReportPage";
+import PageSourceViewPage from "../pages/PageSourceViewPage";
 
 export default function AppRoutes() {
   return (
@@ -43,6 +45,16 @@ export default function AppRoutes() {
       <Route
         path="/gmail"
         element={<GmailPage />}
+      />
+
+      <Route
+        path="/deep-analysis/report"
+        element={<DeepAnalysisReportPage />}
+      />
+
+      <Route
+        path="/deep-analysis/source"
+        element={<PageSourceViewPage />}
       />
     </Routes>
   );

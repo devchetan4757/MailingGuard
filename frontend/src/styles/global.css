@@ -2457,6 +2457,109 @@ svg {
 }
 
 /* ---------------------------------------------------------------------
+   Deep analysis modal — the small live-updating window (Modal.jsx +
+   DeepAnalyzeModal). Rows fill in one at a time as the SSE stream
+   delivers each analyzer's result.
+   --------------------------------------------------------------------- */
+
+.ref-deep-btn.is-risk-critical, .ref-deep-btn.is-risk-high {
+  color: #ad584d; border-color: #efd8d4; background: #fff4f2;
+}
+.ref-deep-btn.is-risk-medium { color: #b8873a; border-color: #f0e1c2; background: #fff9ee; }
+
+.ref-deep-modal { display: flex; flex-direction: column; gap: 12px; max-height: 76vh; }
+
+.ref-deep-modal-head {
+  display: flex; align-items: center; gap: 8px;
+  color: #3d8b91; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+}
+.ref-deep-modal-head span { flex: 1 1 auto; }
+.ref-deep-modal-close {
+  border: none; background: none; color: #8b969b; font-size: 10px; font-weight: 600;
+  cursor: pointer; text-transform: none; letter-spacing: 0; padding: 2px 4px;
+}
+.ref-deep-modal-close:hover { color: #405158; }
+
+.ref-deep-modal-progress {
+  display: flex; align-items: center; gap: 6px;
+  color: #7c888d; font-size: 11px; padding: 2px 0;
+}
+
+.ref-deep-verdict {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 9px; border: 1px solid #e4e9ea; background: #fbfcfc;
+}
+.ref-deep-verdict strong { display: block; font-size: 12.5px; color: #263238; }
+.ref-deep-verdict span { font-size: 10.5px; color: #8b969b; }
+.ref-deep-verdict.is-low { border-color: rgba(86,169,138,.35); background: rgba(86,169,138,.06); }
+.ref-deep-verdict.is-low svg { color: #56a98a; }
+.ref-deep-verdict.is-medium { border-color: #f0e1c2; background: #fff9ee; }
+.ref-deep-verdict.is-medium svg { color: #b8873a; }
+.ref-deep-verdict.is-high, .ref-deep-verdict.is-critical { border-color: #efd8d4; background: #fff4f2; }
+.ref-deep-verdict.is-high svg, .ref-deep-verdict.is-critical svg { color: #ad584d; }
+
+.ref-deep-flags {
+  margin: 0; padding: 0 0 0 16px; display: flex; flex-direction: column; gap: 4px;
+  font-size: 11px; color: #3b4b51; line-height: 1.4;
+}
+
+.ref-source-list {
+  display: flex; flex-direction: column; gap: 4px;
+  overflow-y: auto; border-top: 1px dashed #e9edee; padding-top: 8px;
+}
+
+.ref-source-row { border-radius: 7px; }
+.ref-source-row.is-pending { opacity: 0.55; }
+
+.ref-source-row-head {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  border: none; background: none; padding: 6px 4px; cursor: pointer;
+  font-size: 11.5px; color: #3b4b51; text-align: left;
+}
+.ref-source-row-head:disabled { cursor: default; }
+.ref-source-row-head span { flex: 1 1 auto; }
+
+.ref-source-icon.is-flagged { color: #ad584d; }
+.ref-source-icon.is-clean { color: #56a98a; }
+.ref-source-dot.is-skipped {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  background: #d7dcdd;
+}
+.ref-source-note { color: #a5aeb2; font-size: 9.5px; font-style: normal; }
+.ref-source-chevron { color: #a5aeb2; flex: 0 0 auto; }
+
+.ref-source-detail { padding: 0 4px 8px 25px; }
+
+.ref-source-detail-error {
+  padding: 8px 10px;
+  margin: 2px 4px 6px 25px;
+  border-radius: 7px;
+  background: #fff4f2;
+  border: 1px solid #efd8d4;
+}
+.ref-source-error-detail {
+  margin: 0;
+  color: #ad584d;
+  font-size: 11px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+/* Inline "AI Deep Analysis" result panel — same content as the modal, but
+   dropped straight into a card's own flow (attachment card / url card)
+   instead of popping up over the page, so it only needs a divider, not
+   its own border/background. */
+.ref-deep-panel-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px dashed #e9edee;
+}
+.ref-deep-panel-inline:empty { display: none; margin: 0; padding: 0; border: 0; }
+
+/* ---------------------------------------------------------------------
    Extracted links — card grid + pagination.
    Host is the primary scan target for a security reviewer, so it sits on
    its own line at full weight; the path is secondary and quieter below it.

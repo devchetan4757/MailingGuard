@@ -26,13 +26,17 @@ way, so this page keeps working even without Groq wired up.
 
 from __future__ import annotations
 
+import json
 import tempfile
 from pathlib import Path
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from app.ai_analyzers.url_analyzer.analyzer import analyze_url_stream
+from app.ai_analyzers.url_analyzer.crawler import fetch_page_source
 from app.core.config import settings
 from app.dispatcher import (
     analyze_image_attachment,
@@ -54,6 +58,10 @@ router = APIRouter(
 # for the isolated subprocess call, so a slightly more generous cap than
 # the main 2MB .eml limit is fine here.
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024  # 10 MB
+
+# A preview is meant to be read, not mirrored -- cap what we ship back so
+# one huge page can't blow up the response or the browser tab rendering it.
+MAX_PREVIEW_HTML_BYTES = 3 * 1024 * 1024  # 3 MB
 
 ALLOWED_PDF_EXTENSIONS = {".pdf"}
 
@@ -183,6 +191,97 @@ async def deep_analyze_domain(payload: DomainRequest):
         "option": "analyze_sender_domain",
         "result": result,
         "explanation": _explain("analyze_sender_domain", result),
+    }
+
+
+def _format_sse(event_type: str, payload: dict) -> str:
+    """
+    Standard Server-Sent-Events framing. `event:` lets the frontend's
+    EventSource listen with addEventListener("source", ...) /
+    addEventListener("done", ...) instead of parsing payload shape.
+    """
+    return f"event: {event_type}\ndata: {json.dumps(payload, default=str)}\n\n"
+
+
+def _stream_url_analysis(url: str, option_id: str):
+    """
+    Wraps analyze_url_stream() for SSE: forwards each ("source", ...)
+    event to the client immediately as it's produced, and attaches the
+    Groq explanation to the final ("done", ...) event once every
+    source has reported in.
+    """
+    for event_type, payload in analyze_url_stream(url):
+        if event_type == "done":
+            payload["explanation"] = _explain(option_id, payload.get("sources", {}))
+        yield _format_sse(event_type, payload)
+
+
+@router.get("/link/stream")
+async def deep_analyze_link_stream(url: str = Query(..., description="URL to analyze")):
+    """
+    Live-updating version of POST /deep-analysis/link. Same analyzers,
+    same result shape, but each of the ~12 checks (WHOIS, Safe
+    Browsing, urlscan, VirusTotal, ...) streams back to the frontend
+    the instant it finishes, instead of the client waiting for the
+    slowest one (usually urlscan, ~15-25s) before seeing anything.
+
+    Consume with EventSource on the frontend:
+        source.addEventListener("source", (e) => { ...one analyzer's result... })
+        source.addEventListener("done", (e) => { ...verdict + explanation... })
+    """
+    validated_url = _validate_url(url)
+    return StreamingResponse(
+        _stream_url_analysis(validated_url, "analyze_link"),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.get("/domain/stream")
+async def deep_analyze_domain_stream(domain: str = Query(..., description="Domain to analyze")):
+    """Live-updating version of POST /deep-analysis/domain. See /link/stream above."""
+    domain = (domain or "").strip()
+
+    if not domain:
+        raise HTTPException(status_code=400, detail="No domain provided.")
+
+    return StreamingResponse(
+        _stream_url_analysis(domain, "analyze_sender_domain"),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.get("/page-source")
+async def deep_analysis_page_source(url: str = Query(..., description="URL to fetch raw HTML for")):
+    """
+    Backs the "Preview page" button on the Deep Analysis Report page.
+
+    Fetches the URL's HTML *server-side* (same crawler the `crawl` check
+    uses) and hands it back as JSON so the frontend can render a
+    sandboxed, script-free preview -- the user's own browser never
+    connects to the target URL directly. This intentionally doesn't
+    re-run the other 10 checks; it's just the raw fetch.
+    """
+    validated_url = _validate_url(url)
+
+    try:
+        source = fetch_page_source(validated_url)
+    except RuntimeError as error:
+        raise HTTPException(status_code=502, detail=str(error))
+
+    html = source["html"] or ""
+
+    if len(html.encode("utf-8", errors="ignore")) > MAX_PREVIEW_HTML_BYTES:
+        html = (
+            html.encode("utf-8", errors="ignore")[:MAX_PREVIEW_HTML_BYTES].decode("utf-8", errors="ignore")
+            + "\n<!-- truncated: page exceeded the 3 MB preview limit -->"
+        )
+
+    return {
+        "html": html,
+        "final_url": source["final_url"],
+        "status_code": source["status_code"],
     }
 
 

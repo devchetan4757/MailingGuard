@@ -7,15 +7,16 @@
 #
 # pdf_analyzer and image_analyzer run in a subprocess with a
 # timeout, since they parse untrusted, possibly malicious files.
-# crawler and whois run in-process since they're low-risk / text-only.
+# url_analyzer (crawl + whois) runs in-process since it's low-risk /
+# text-only -- crawl and whois inside it run concurrently on two
+# threads instead of one after another.
 
 import json
 import subprocess
 import sys
 from pathlib import Path
 
-from app.ai_analyzers.crawler.crawler import crawl
-from app.ai_analyzers.whois.whois_lookup import lookup_domain
+from app.ai_analyzers.url_analyzer.analyzer import analyze_url
 
 # Paths to the CLI-wrapped scripts (used for subprocess isolation)
 BASE_DIR = Path(__file__).resolve().parent
@@ -52,16 +53,25 @@ def _run_isolated(script_path, arg):
 
 
 def analyze_link(url: str) -> dict:
-    """UI option: 'Analyze links found in this email'."""
+    """
+    UI option: 'Analyze links found in this email'.
+    Runs the page crawl and a WHOIS/DNS lookup on the link's domain
+    at the same time. Returns {"url", "domain", "crawl", "whois"}.
+    """
     try:
-        return crawl(url)
+        return analyze_url(url)
     except Exception as error:
         return {"error": str(error), "url": url}
 
 
 def analyze_sender_domain(domain: str) -> dict:
-    """UI option: 'Check sender domain'."""
-    return lookup_domain(domain)
+    """
+    UI option: 'Check sender domain'.
+    Same combined crawl + WHOIS/DNS analyzer as analyze_link, just
+    called with a bare domain instead of a full link.
+    Returns {"url", "domain", "crawl", "whois"}.
+    """
+    return analyze_url(domain)
 
 
 def analyze_pdf_attachment(file_path: str) -> dict:

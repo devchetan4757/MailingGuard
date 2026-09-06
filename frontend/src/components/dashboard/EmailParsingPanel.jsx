@@ -1,6 +1,7 @@
 // src/components/dashboard/EmailParsingPanel.jsx
 
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import {
   Link2,
@@ -18,6 +19,7 @@ import {
   UserRound,
   ChevronLeft,
   ChevronRight,
+  Maximize2,
 } from "lucide-react";
 
 import {
@@ -36,7 +38,7 @@ import {
 import { DashboardPanel, DashboardStat } from "./DashboardWidgets";
 import { DeepAnalyzeTrigger, DeepAnalyzePanel } from "../results/DeepAnalysisResult";
 import { useDeepAnalysis } from "../../hooks/useDeepAnalysis";
-import { analyzeLink, analyzeCaseAttachment } from "../../api/deepAnalysisApi";
+import { streamAnalyzeLink, analyzeCaseAttachment } from "../../api/deepAnalysisApi";
 
 const AUTH_KEYS = ["spf", "dkim", "dmarc"];
 
@@ -222,7 +224,8 @@ function EmptyBlock({ text }) {
 }
 
 export default function EmailParsingPanel({ currentCase }) {
-  const { state: deepState, run: runDeep, clear: clearDeep } = useDeepAnalysis();
+  const navigate = useNavigate();
+  const { state: deepState, run: runDeep, runStream: runDeepStream, clear: clearDeep } = useDeepAnalysis();
   const [urlPage, setUrlPage] = useState(1);
 
   useEffect(() => {
@@ -369,7 +372,7 @@ export default function EmailParsingPanel({ currentCase }) {
                 const index = (urlPageSafe - 1) * URLS_PER_PAGE + pagedIndex;
                 const key = `url-${index}`;
                 const entry = deepState[key];
-                const run = () => runDeep(key, () => analyzeLink(url));
+                const run = () => runDeepStream(key, (callbacks) => streamAnalyzeLink(url, callbacks));
                 const clear = () => clearDeep(key);
                 const { host, rest } = splitUrl(url);
 
@@ -385,6 +388,17 @@ export default function EmailParsingPanel({ currentCase }) {
 
                     <div className="ref-url-card-foot">
                       <DeepAnalyzeTrigger label={url} entry={entry} onRun={run} onClear={clear} />
+                      {entry && (
+                        <button
+                          type="button"
+                          className="ref-deep-expand-btn"
+                          onClick={() => navigate("/deep-analysis/report", { state: { url, entry } })}
+                          title="Open the full deep analysis report for this link"
+                        >
+                          <Maximize2 size={13} />
+                          Full report
+                        </button>
+                      )}
                     </div>
 
                     <DeepAnalyzePanel entry={entry} onRun={run} onClear={clear} />
