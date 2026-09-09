@@ -1,155 +1,96 @@
+"""MailGuard PDF security report generator.
+
+Keeps the existing Report Generation page/API contract while changing only
+the generated PDF content.
+
+Report sections:
+1. Executive Summary
+2. Email Information
+3. Authentication
+4. Origin & Route Analysis
+5. Security Findings
+6. URL Analysis
+7. Attachments
+8. AI / Analyst Explanation
+9. Recommended Action
+10. Forensic / Audit Data
+
+Risk Score Breakdown is intentionally excluded.
 """
-Epic 4 — reporting: downloadable PDF case file.
 
-Owner: whoever is assigned Epic 4 in OWNERSHIP.md.
-Remember to run any email-derived text through
-`app.core.security.escape_for_report` before it goes into the PDF.
+from __future__ import annotations
 
-CONTRACT:
-    build_case_pdf(case: dict) -> bytes
-        `case` is shaped like schemas.AnalyzeResponse (see
-        app/models/schemas.py), plus two convenience keys the report
-        route adds before calling this function:
-            analyzedAt    (str)         - ISO timestamp, from the store record
-            previousHash  (str | None)  - previous case's hash in the chain
-        Returns raw PDF bytes.
-"""
-
+from datetime import datetime
 from io import BytesIO
+from typing import Any
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
-from reportlab.platypus import (
-    SimpleDocTemplate,
-    Paragraph,
-    Spacer,
-    Table,
-    TableStyle,
-)
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from app.core.security import escape_for_report
 
 
-# ============================================================
-# MailGuard REPORT PALETTE
-# ============================================================
-
 NAVY = colors.HexColor("#101827")
 BLUE = colors.HexColor("#2563EB")
+CYAN = colors.HexColor("#0891B2")
 PURPLE = colors.HexColor("#7C3AED")
-PURPLE_SOFT = colors.HexColor("#F2ECFF")
+ORANGE = colors.HexColor("#EA580C")
 RED = colors.HexColor("#DC2626")
 RED_SOFT = colors.HexColor("#FDECEC")
 AMBER = colors.HexColor("#CA8A04")
 AMBER_SOFT = colors.HexColor("#FFF8DD")
 GREEN = colors.HexColor("#15803D")
 GREEN_SOFT = colors.HexColor("#EAF8EF")
-CYAN = colors.HexColor("#0891B2")
+LIGHT = colors.HexColor("#F4F6F8")
+LIGHT_BLUE = colors.HexColor("#F7FAFF")
+LIGHT_PURPLE = colors.HexColor("#FAF8FF")
+LINE = colors.HexColor("#DCE1E8")
 INK = colors.HexColor("#18212F")
 MUTED = colors.HexColor("#687386")
-LIGHT = colors.HexColor("#F4F6F8")
-LINE = colors.HexColor("#DCE1E8")
 WHITE = colors.white
 
 
-def esc(value) -> str:
-    """Run any potentially email-derived value through the shared escaper."""
-    if value is None:
-        return ""
-    return escape_for_report(str(value))
+def esc(value: Any) -> str:
+    return "" if value is None else escape_for_report(str(value))
 
 
-def severity_palette(severity):
-    value = str(severity or "").strip().lower()
-    if value == "red":
-        return RED, RED_SOFT, "HIGH RISK"
-    if value == "yellow":
-        return AMBER, AMBER_SOFT, "MEDIUM RISK"
-    if value == "green":
-        return GREEN, GREEN_SOFT, "LOW RISK"
-    return MUTED, LIGHT, "UNKNOWN"
+def styles():
+    s = getSampleStyleSheet()
+    s.add(ParagraphStyle(name="ReportTitle", fontName="Helvetica-Bold", fontSize=21,
+                          leading=24, textColor=INK))
+    s.add(ParagraphStyle(name="Subtitle", fontName="Helvetica", fontSize=8.5,
+                          leading=12, textColor=MUTED))
+    s.add(ParagraphStyle(name="Section", fontName="Helvetica-Bold", fontSize=12,
+                          leading=15, textColor=INK, spaceAfter=6))
+    s.add(ParagraphStyle(name="Label", fontName="Helvetica-Bold", fontSize=7.2,
+                          leading=9, textColor=MUTED))
+    s.add(ParagraphStyle(name="Value", fontName="Helvetica", fontSize=8.8,
+                          leading=12, textColor=INK))
+    s.add(ParagraphStyle(name="Body", fontName="Helvetica", fontSize=8.5,
+                          leading=13, textColor=INK))
+    s.add(ParagraphStyle(name="Small", fontName="Helvetica", fontSize=7.4,
+                          leading=10, textColor=MUTED))
+    s.add(ParagraphStyle(name="TH", fontName="Helvetica-Bold", fontSize=7.2,
+                          leading=9, textColor=WHITE))
+    s.add(ParagraphStyle(name="TB", fontName="Helvetica", fontSize=7.5,
+                          leading=10, textColor=INK))
+    s.add(ParagraphStyle(name="Center", fontName="Helvetica", fontSize=7.5,
+                          leading=10, textColor=MUTED, alignment=TA_CENTER))
+    return s
 
 
-def auth_palette(value):
-    v = str(value or "").strip().lower()
-    if v == "pass":
-        return GREEN, GREEN_SOFT
-    if v == "fail":
-        return RED, RED_SOFT
-    return MUTED, LIGHT
+def P(value, s, style="Value"):
+    return Paragraph(esc(value), s[style])
 
 
-def urgency_palette(value):
-    v = str(value or "").strip().lower()
-    if v == "high":
-        return RED, RED_SOFT
-    if v == "medium":
-        return AMBER, AMBER_SOFT
-    return GREEN, GREEN_SOFT
-
-
-def get_styles():
-    styles = getSampleStyleSheet()
-
-    styles.add(ParagraphStyle(
-        name="ReportTitle", fontName="Helvetica-Bold", fontSize=21,
-        leading=24, textColor=INK,
-    ))
-    styles.add(ParagraphStyle(
-        name="Subtitle", fontName="Helvetica", fontSize=8.5,
-        leading=12, textColor=MUTED,
-    ))
-    styles.add(ParagraphStyle(
-        name="Section", fontName="Helvetica-Bold", fontSize=12,
-        leading=15, textColor=INK, spaceAfter=7,
-    ))
-    styles.add(ParagraphStyle(
-        name="Label", fontName="Helvetica-Bold", fontSize=7.2,
-        leading=9, textColor=MUTED, spaceAfter=2,
-    ))
-    styles.add(ParagraphStyle(
-        name="Value", fontName="Helvetica", fontSize=9,
-        leading=12, textColor=INK,
-    ))
-    styles.add(ParagraphStyle(
-        name="Body", fontName="Helvetica", fontSize=8.5,
-        leading=13, textColor=INK,
-    ))
-    styles.add(ParagraphStyle(
-        name="Small", fontName="Helvetica", fontSize=7.5,
-        leading=10, textColor=MUTED,
-    ))
-    styles.add(ParagraphStyle(
-        name="TableHeader", fontName="Helvetica-Bold", fontSize=7.2,
-        leading=9, textColor=WHITE,
-    ))
-    styles.add(ParagraphStyle(
-        name="TableBody", fontName="Helvetica", fontSize=7.8,
-        leading=11, textColor=INK,
-    ))
-    styles.add(ParagraphStyle(
-        name="Risk", fontName="Helvetica-Bold", fontSize=27,
-        leading=29, textColor=RED, alignment=TA_CENTER,
-    ))
-    styles.add(ParagraphStyle(
-        name="Badge", fontName="Helvetica-Bold", fontSize=7.5,
-        leading=9, alignment=TA_CENTER,
-    ))
-
-    return styles
-
-
-def P(value, styles, style="Value"):
-    return Paragraph(esc(value), styles[style])
-
-
-def badge(text, fg, bg, styles, width=30 * mm):
+def badge(text, fg, bg, s, width=30 * mm):
     p = Paragraph(
         f'<font color="{fg.hexval()}"><b>{esc(text)}</b></font>',
-        styles["Badge"],
+        s["Center"],
     )
     t = Table([[p]], colWidths=[width], rowHeights=[7 * mm])
     t.setStyle(TableStyle([
@@ -162,510 +103,618 @@ def badge(text, fg, bg, styles, width=30 * mm):
     return t
 
 
-def key_value_table(rows, styles, accent=BLUE):
-    data = [[P(k, styles, "Label"), P(v, styles, "Value")] for k, v in rows]
-    table = Table(data, colWidths=[46 * mm, 134 * mm], repeatRows=0)
-    table.setStyle(TableStyle([
+def section_heading(number, title, s, color=BLUE):
+    n = Table([[Paragraph(
+        f'<font color="{WHITE.hexval()}"><b>{esc(number)}</b></font>', s["Center"]
+    )]], colWidths=[9 * mm], rowHeights=[8 * mm])
+    n.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), color),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    h = Table([[n, Paragraph(esc(title), s["Section"])]],
+              colWidths=[11 * mm, 169 * mm])
+    h.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    return h
+
+
+def kv(rows, s, accent=BLUE):
+    t = Table([[P(k, s, "Label"), P(v, s)] for k, v in rows],
+              colWidths=[48 * mm, 132 * mm])
+    t.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (0, -1), LIGHT),
         ("LINEBELOW", (0, 0), (-1, -1), 0.45, LINE),
+        ("LINEBEFORE", (0, 0), (0, -1), 2, accent),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("LEFTPADDING", (0, 0), (-1, -1), 8),
         ("RIGHTPADDING", (0, 0), (-1, -1), 8),
         ("TOPPADDING", (0, 0), (-1, -1), 7),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
-        ("LINEBEFORE", (0, 0), (0, -1), 2, accent),
     ]))
-    return table
+    return t
 
 
-def section_heading(number, title, styles, color=BLUE):
-    number_cell = Table(
-        [[Paragraph(f'<font color="{WHITE.hexval()}"><b>{esc(number)}</b></font>', styles["Badge"])]],
-        colWidths=[9 * mm], rowHeights=[8 * mm],
-    )
-    number_cell.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), color),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-    ]))
-    heading = Table(
-        [[number_cell, Paragraph(esc(title), styles["Section"])]],
-        colWidths=[11 * mm, 169 * mm],
-    )
-    heading.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-    ]))
-    return heading
-
-
-def risk_bar(score, accent):
+def severity_palette(value):
+    v = str(value or "").lower()
+    if v == "red":
+        return RED, RED_SOFT, "HIGH RISK"
+    if v == "yellow":
+        return AMBER, AMBER_SOFT, "MEDIUM RISK"
+    if v == "green":
+        return GREEN, GREEN_SOFT, "LOW RISK"
     try:
-        score = float(score)
+        score = float(value)
     except (TypeError, ValueError):
-        score = 0
-    score = max(0, min(100, score))
-    filled = max(1, int(150 * score / 100))
-    remaining = max(1, 150 - filled)
-
-    bar = Table([["", ""]], colWidths=[filled * mm, remaining * mm], rowHeights=[4 * mm])
-    bar.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (0, 0), accent),
-        ("BACKGROUND", (1, 0), (1, 0), colors.HexColor("#E5E7EB")),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-    ]))
-    return bar
+        return MUTED, LIGHT, "UNKNOWN RISK"
+    if score >= 70:
+        return RED, RED_SOFT, "HIGH RISK"
+    if score >= 35:
+        return AMBER, AMBER_SOFT, "MEDIUM RISK"
+    return GREEN, GREEN_SOFT, "LOW RISK"
 
 
-def draw_background(canvas, document):
-    canvas.saveState()
-    width, height = A4
-
-    canvas.setFillColor(NAVY)
-    canvas.rect(0, height - 24 * mm, width, 24 * mm, stroke=0, fill=1)
-    canvas.setFillColor(RED)
-    canvas.rect(0, height - 24 * mm, 5 * mm, 24 * mm, stroke=0, fill=1)
-
-    canvas.setFillColor(NAVY)
-    canvas.rect(0, 0, width, 13 * mm, stroke=0, fill=1)
-
-    canvas.setFont("Helvetica-Bold", 7)
-    canvas.setFillColor(WHITE)
-    canvas.drawString(18 * mm, 5.2 * mm, "MailGuard  /  FORENSIC REPORT ENGINE")
-
-    canvas.setFont("Helvetica", 7)
-    canvas.drawRightString(192 * mm, 5.2 * mm, f"PAGE {document.page}")
-
-    canvas.setFillColor(WHITE)
-    canvas.setFont("Helvetica-Bold", 10)
-    canvas.drawString(18 * mm, height - 10 * mm, "MailGuard")
-
-    canvas.setFont("Helvetica", 7)
-    canvas.setFillColor(colors.HexColor("#C9D2E1"))
-    canvas.drawString(18 * mm, height - 16 * mm, "EMAIL THREAT DETECTION  •  FORENSIC INTELLIGENCE REPORT")
-
-    canvas.restoreState()
+def auth_badge(value, s):
+    v = str(value or "none").lower()
+    if v == "pass":
+        return badge("PASS", GREEN, GREEN_SOFT, s, 27 * mm)
+    if v in {"fail", "softfail", "permerror", "temperror", "mismatch"}:
+        return badge(v.upper(), RED, RED_SOFT, s, 27 * mm)
+    if v == "match":
+        return badge("MATCH", GREEN, GREEN_SOFT, s, 27 * mm)
+    return badge(v.upper(), MUTED, LIGHT, s, 27 * mm)
 
 
-def build_case_pdf(case: dict) -> bytes:
-    styles = get_styles()
-    pdf_buffer = BytesIO()
+def format_date(value):
+    if not value:
+        return ""
+    try:
+        return datetime.fromisoformat(
+            str(value).replace("Z", "+00:00")
+        ).strftime("%d %b %Y %H:%M UTC")
+    except ValueError:
+        return str(value)
 
-    document = SimpleDocTemplate(
-        pdf_buffer,
-        pagesize=A4,
-        rightMargin=15 * mm,
-        leftMargin=15 * mm,
-        topMargin=31 * mm,
-        bottomMargin=18 * mm,
-        title="MailGuard Case Report",
-        author="MailGuard",
-        subject="Email Threat Detection & Forensic Intelligence Report",
-    )
 
-    story = []
+def collect_findings(case, trace):
+    out = []
 
-    case_id = case.get("caseId", "UNASSIGNED")
-    risk_score = case.get("riskScore", 0)
-    severity = case.get("severity", "green")
-    analyzed_at = case.get("analyzedAt", "")
-    case_hash = case.get("caseHash", "")
-    previous_hash = case.get("previousHash")
+    # Primary scoring findings are stored in dashboard.findings by the
+    # current /api/analyze response shape.
+    dashboard_findings = ((case.get("dashboard") or {}).get("findings") or [])
+    analysis_findings = ((case.get("analysis") or {}).get("findings") or [])
+    source_findings = dashboard_findings or analysis_findings
 
-    header_checks = case.get("headerChecks") or {}
-    ai_signals = case.get("aiSignals") or {}
-    origin = case.get("origin") or {}
-    related_cases = case.get("relatedCases") or []
-    analysis = case.get("analysis") or {}
-    metadata = analysis.get("metadata") or {}
+    for item in source_findings:
+        if isinstance(item, dict):
+            out.append({
+                "severity": str(item.get("severity") or "low").upper(),
+                "signal": item.get("signal") or item.get("category") or "Security finding",
+                "message": item.get("message") or item.get("detail") or "",
+            })
 
-    severity_fg, severity_bg, severity_label = severity_palette(severity)
+    checks = case.get("headerChecks") or {}
+    if checks.get("senderDomainMismatch"):
+        out.append({
+            "severity": "HIGH",
+            "signal": "Reply-To mismatch",
+            "message": "The Reply-To domain differs from the sender domain.",
+        })
 
-    # ------------------------------------------------------------
-    # Intro band
-    # ------------------------------------------------------------
-    story.append(Spacer(1, 3 * mm))
+    for hop in trace.get("hops") or []:
+        for flag in hop.get("suspicious_flags") or []:
+            if not isinstance(flag, dict):
+                continue
+            reason = str(flag.get("reason") or "origin signal")
+            out.append({
+                "severity": "HIGH" if reason == "blacklist" else "MEDIUM",
+                "signal": reason.replace("_", " ").title(),
+                "message": flag.get("detail") or reason,
+            })
 
-    intro_left = [
-        Paragraph(
-            '<font color="#DC2626" size="8"><b>CONFIDENTIAL</b></font>',
-            styles["Small"],
-        ),
-        Spacer(1, 1.5 * mm),
-        Paragraph("SECURITY CASE REPORT", styles["ReportTitle"]),
-        Spacer(1, 1 * mm),
-        Paragraph("Email Threat Detection &amp; Forensic Intelligence", styles["Subtitle"]),
-    ]
+    seen = set()
+    unique = []
+    for item in out:
+        key = (item["severity"], item["signal"], item["message"])
+        if key not in seen:
+            seen.add(key)
+            unique.append(item)
+    return unique
 
-    intro = Table(
-        [[
-            intro_left,
-            Paragraph(
-                '<font color="#687386" size="7"><b>CASE ID</b></font><br/>'
-                f'<font size="11"><b>{esc(case_id)}</b></font><br/><br/>'
-                '<font color="#687386" size="7"><b>ANALYZED AT</b></font><br/>'
-                f'<font size="8">{esc(analyzed_at)}</font>',
-                styles["Body"],
-            ),
-        ]],
-        colWidths=[119 * mm, 61 * mm],
-    )
-    intro.setStyle(TableStyle([
-        ("BOX", (0, 0), (-1, -1), 0.7, LINE),
-        ("LINEBEFORE", (0, 0), (0, 0), 4, RED),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 11),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 11),
-        ("TOPPADDING", (0, 0), (-1, -1), 10),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
-    ]))
-    story.append(intro)
-    story.append(Spacer(1, 6 * mm))
 
-    # ------------------------------------------------------------
-    # Risk summary
-    # ------------------------------------------------------------
-    risk_panel = Table(
-        [[
-            [
-                Paragraph("FRAUD RISK SCORE", styles["Label"]),
-                Paragraph(
-                    f'<font color="{severity_fg.hexval()}"><b>{esc(risk_score)}</b></font>'
-                    '<font color="#687386" size="9"> / 100</font>',
-                    styles["Risk"],
-                ),
-                risk_bar(risk_score, severity_fg),
-                Spacer(1, 2 * mm),
-                Paragraph("Higher score indicates stronger fraud/phishing risk.", styles["Small"]),
-            ],
-            [
-                Paragraph("THREAT CLASSIFICATION", styles["Label"]),
-                badge(severity_label, severity_fg, severity_bg, styles, width=38 * mm),
-                Spacer(1, 3 * mm),
-                Paragraph("Automated classification based on analysis signals.", styles["Small"]),
-            ],
-        ]],
-        colWidths=[110 * mm, 70 * mm],
-    )
-    risk_panel.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (0, 0), colors.HexColor("#F7FAFF")),
-        ("BACKGROUND", (1, 0), (1, 0), severity_bg),
-        ("BOX", (0, 0), (-1, -1), 0.8, LINE),
-        ("LINEBEFORE", (1, 0), (1, 0), 0.7, LINE),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 10),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
-        ("TOPPADDING", (0, 0), (-1, -1), 10),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
-    ]))
-    story.append(risk_panel)
-    story.append(Spacer(1, 7 * mm))
+def render_findings(findings, s):
+    if not findings:
+        return kv([("Status", "No explicit security findings were recorded.")], s, GREEN)
 
-    # ------------------------------------------------------------
-    # 01. Case information
-    # ------------------------------------------------------------
-    story.append(section_heading("01", "CASE INFORMATION", styles, BLUE))
-    story.append(key_value_table(
-        [
-            ("Case ID", case_id),
-            ("Analyzed At", analyzed_at),
-            ("Current Case Hash", case_hash),
-            ("Previous Case Hash", previous_hash or "— (first case in chain)"),
-        ],
-        styles, BLUE,
-    ))
-    story.append(Spacer(1, 6 * mm))
-
-    # ------------------------------------------------------------
-    # 02. Email forensics
-    # ------------------------------------------------------------
-    story.append(section_heading("02", "EMAIL FORENSICS", styles, CYAN))
-    story.append(key_value_table(
-        [
-            ("From", metadata.get("from", "")),
-            ("Reply-To", metadata.get("reply_to", "")),
-            ("To", metadata.get("to", "")),
-            ("Subject", metadata.get("subject", "")),
-            ("Date", metadata.get("date", "")),
-        ],
-        styles, CYAN,
-    ))
-    story.append(Spacer(1, 6 * mm))
-
-    # ------------------------------------------------------------
-    # 03. Header security checks
-    # ------------------------------------------------------------
-    story.append(section_heading("03", "HEADER SECURITY CHECKS", styles, GREEN))
-
-    header_rows = [
-        ("SPF", header_checks.get("spf", "none"), "Sender authorization check"),
-        ("DKIM", header_checks.get("dkim", "none"), "Message signature verification"),
-        ("DMARC", header_checks.get("dmarc", "none"), "Domain authentication / alignment"),
-        (
-            "Sender Domain Mismatch",
-            "yes" if header_checks.get("senderDomainMismatch") else "no",
-            "From-domain vs. reply-to domain mismatch",
-        ),
-    ]
-
-    data = [[
-        Paragraph("CHECK", styles["TableHeader"]),
-        Paragraph("RESULT", styles["TableHeader"]),
-        Paragraph("ASSESSMENT", styles["TableHeader"]),
-    ]]
-
-    for name, result, assessment in header_rows:
-        fg, bg = auth_palette(result) if name != "Sender Domain Mismatch" else (
-            (RED, RED_SOFT) if result == "yes" else (GREEN, GREEN_SOFT)
-        )
-        data.append([
-            P(name, styles, "TableBody"),
-            badge(result.upper(), fg, bg, styles, width=26 * mm),
-            P(assessment, styles, "TableBody"),
+    rows = [[Paragraph("SEVERITY", s["TH"]), Paragraph("SIGNAL", s["TH"]),
+             Paragraph("EVIDENCE", s["TH"])]]
+    for f in findings:
+        sev = str(f["severity"]).upper()
+        if sev == "HIGH":
+            fg, bg = RED, RED_SOFT
+        elif sev in {"MEDIUM", "MODERATE"}:
+            fg, bg = AMBER, AMBER_SOFT
+        else:
+            fg, bg = GREEN, GREEN_SOFT
+        rows.append([
+            badge(sev, fg, bg, s, 24 * mm),
+            P(f["signal"], s, "TB"),
+            P(f["message"], s, "TB"),
         ])
-
-    security_table = Table(data, colWidths=[48 * mm, 35 * mm, 97 * mm], repeatRows=1)
-    security_commands = [
+    t = Table(rows, colWidths=[28 * mm, 48 * mm, 104 * mm], repeatRows=1)
+    t.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), NAVY),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("LINEBELOW", (0, 0), (-1, 0), 0.8, NAVY),
         ("LINEBELOW", (0, 1), (-1, -1), 0.45, LINE),
         ("LEFTPADDING", (0, 0), (-1, -1), 7),
         ("RIGHTPADDING", (0, 0), (-1, -1), 7),
         ("TOPPADDING", (0, 0), (-1, -1), 6),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-    ]
-    for i in range(1, len(data)):
-        if i % 2 == 0:
-            security_commands.append(("BACKGROUND", (0, i), (-1, i), colors.HexColor("#FAFBFC")))
-    security_table.setStyle(TableStyle(security_commands))
-    story.append(security_table)
-    story.append(Spacer(1, 6 * mm))
+    ]))
+    return t
 
-    # ------------------------------------------------------------
-    # 04. AI threat analysis
-    # ------------------------------------------------------------
-    story.append(section_heading("04", "AI THREAT ANALYSIS", styles, PURPLE))
 
-    urgency = ai_signals.get("urgencyLanguage", "low")
-    urgency_fg, urgency_bg = urgency_palette(urgency)
-    impersonation_score = ai_signals.get("impersonationScore", 0)
-    ai_summary = ai_signals.get("summary", "")
+def render_hops(hops, s):
+    rows = [[Paragraph("#", s["TH"]), Paragraph("IP / HOST", s["TH"]),
+             Paragraph("LOCATION", s["TH"]), Paragraph("ISP / ASN", s["TH"]),
+             Paragraph("STATUS", s["TH"])]]
+    for i, hop in enumerate(hops, 1):
+        flagged = bool(
+            hop.get("flagged")
+            or hop.get("suspicious_flags")
+            or (hop.get("blacklist") or {}).get("listed")
+        )
+        fg, bg, status = (
+            (RED, RED_SOFT, "FLAGGED") if flagged
+            else (MUTED, LIGHT, "INTERNAL") if hop.get("internal")
+            else (GREEN, GREEN_SOFT, "OK")
+        )
+        host = hop.get("reverse") or hop.get("hostname") or "—"
+        loc = hop.get("city") or "—"
+        if hop.get("country"):
+            loc = f"{loc} / {hop['country']}" if hop.get("city") else str(hop["country"])
+        rows.append([
+            P(i, s, "TB"),
+            Paragraph(f"<b>{esc(hop.get('ip') or 'Internal')}</b><br/>{esc(host)}", s["TB"]),
+            P(loc, s, "TB"),
+            Paragraph(f"{esc(hop.get('isp') or '—')}<br/>ASN {esc(hop.get('asn') or '—')}", s["TB"]),
+            badge(status, fg, bg, s, 22 * mm),
+        ])
+    t = Table(rows, colWidths=[10 * mm, 46 * mm, 40 * mm, 54 * mm, 30 * mm], repeatRows=1)
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LINEBELOW", (0, 0), (-1, 0), 0.8, NAVY),
+        ("LINEBELOW", (0, 1), (-1, -1), 0.45, LINE),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    return t
 
-    ai_top = Table(
-        [[
-            [
-                Paragraph("URGENCY LANGUAGE", styles["Label"]),
-                badge(str(urgency).upper(), urgency_fg, urgency_bg, styles, width=28 * mm),
-            ],
-            [
-                Paragraph("IMPERSONATION SCORE", styles["Label"]),
-                Paragraph(
-                    f'<font color="{PURPLE.hexval()}" size="18"><b>{esc(impersonation_score)}</b></font>'
-                    '<font color="#687386"> / 100</font>',
-                    styles["Body"],
-                ),
-            ],
-        ]],
-        colWidths=[90 * mm, 90 * mm],
+
+def render_trace(hops, s):
+    public = [h for h in hops if h.get("ip") and not h.get("internal")]
+    if len(public) < 2:
+        return kv([("TraceMap", "Insufficient geolocated public hops for a route diagram.")], s, ORANGE)
+
+    cells = []
+    for idx, hop in enumerate(public):
+        flagged = bool(
+            hop.get("flagged")
+            or hop.get("suspicious_flags")
+            or (hop.get("blacklist") or {}).get("listed")
+        )
+        fg, bg = (RED, RED_SOFT) if flagged else (BLUE, LIGHT_BLUE)
+        label = hop.get("city") or hop.get("country") or "Unknown"
+        ip = hop.get("ip") or "—"
+        box = Table([[
+            Paragraph(
+                f'<font color="{fg.hexval()}"><b>●</b></font><br/>'
+                f'<font size="6"><b>{esc(ip)}</b></font><br/>'
+                f'<font size="6">{esc(label)}</font>',
+                s["Center"]
+            )
+        ]], colWidths=[30 * mm])
+        box.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), bg),
+            ("BOX", (0, 0), (-1, -1), 0.6, fg),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        cells.append(box)
+        if idx < len(public) - 1:
+            cells.append(Paragraph('<font size="13">→</font>', s["Center"]))
+
+    t = Table([cells], colWidths=[
+        30 * mm if i % 2 == 0 else 8 * mm for i in range(len(cells))
+    ])
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), LIGHT_BLUE),
+        ("BOX", (0, 0), (-1, -1), 0.6, LINE),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    return t
+
+
+def render_urls(urls, dashboard, s):
+    suspicious = int(((dashboard.get("metrics") or {}).get("suspiciousUrlCount") or 0))
+    if not urls:
+        return kv([("Extracted URLs", "None detected.")], s, CYAN)
+
+    rows = [[Paragraph("URL", s["TH"]), Paragraph("STATUS", s["TH"]),
+             Paragraph("RESULT", s["TH"])]]
+    for i, raw in enumerate(urls, 1):
+        if isinstance(raw, dict):
+            url = raw.get("url") or raw.get("value") or ""
+            is_suspicious = bool(raw.get("suspicious"))
+            reason = raw.get("reason") or raw.get("verdict") or ""
+        else:
+            url = str(raw)
+            is_suspicious = i <= suspicious
+            reason = ""
+        if is_suspicious:
+            fg, bg, status = RED, RED_SOFT, "SUSPICIOUS"
+            result = reason or "Flagged by the stored case analysis."
+        else:
+            fg, bg, status = GREEN, GREEN_SOFT, "EXTRACTED"
+            result = reason or "Extracted from the email; no per-URL reputation result is stored in this case."
+        rows.append([
+            P(f"{i}. {url}", s, "TB"),
+            badge(status, fg, bg, s, 27 * mm),
+            P(result, s, "TB"),
+        ])
+    t = Table(rows, colWidths=[86 * mm, 31 * mm, 63 * mm], repeatRows=1)
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LINEBELOW", (0, 0), (-1, 0), 0.8, NAVY),
+        ("LINEBELOW", (0, 1), (-1, -1), 0.45, LINE),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    return t
+
+
+def render_attachments(items, s):
+    if not items:
+        return kv([("Attachments", "None detected.")], s, ORANGE)
+
+    rows = [[Paragraph("FILE", s["TH"]), Paragraph("TYPE / SIZE", s["TH"]),
+             Paragraph("RESULT", s["TH"])]]
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        name = item.get("filename") or "Unnamed attachment"
+        ext = item.get("extension") or "—"
+        size = item.get("size")
+        suspicious = bool(item.get("suspicious"))
+        reason = item.get("reason") or (
+            "Flagged by the parser." if suspicious else "No parser-level issue recorded."
+        )
+        fg, bg, status = (
+            (RED, RED_SOFT, "SUSPICIOUS") if suspicious
+            else (GREEN, GREEN_SOFT, "NO FLAG")
+        )
+        rows.append([
+            P(name, s, "TB"),
+            Paragraph(f"{esc(ext)}<br/>{esc(str(size) if size is not None else '—')} bytes", s["TB"]),
+            Paragraph(
+                f'<font color="{fg.hexval()}"><b>{esc(status)}</b></font><br/>{esc(reason)}',
+                s["TB"]
+            ),
+        ])
+    t = Table(rows, colWidths=[65 * mm, 39 * mm, 76 * mm], repeatRows=1)
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LINEBELOW", (0, 0), (-1, 0), 0.8, NAVY),
+        ("LINEBELOW", (0, 1), (-1, -1), 0.45, LINE),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    return t
+
+
+def recommendation(score, findings):
+    try:
+        value = float(score)
+    except (TypeError, ValueError):
+        value = 0
+    high = sum(1 for f in findings if str(f.get("severity")).upper() == "HIGH")
+    if value >= 70 or high >= 2:
+        return "BLOCK / QUARANTINE", RED, RED_SOFT, "Treat this message as high risk. Do not open links or attachments."
+    if value >= 35 or high == 1:
+        return "REVIEW / QUARANTINE", AMBER, AMBER_SOFT, "Review the evidence before delivery and validate sender, origin, and URLs."
+    return "REVIEW / RELEASE", GREEN, GREEN_SOFT, "No strong blocking signal is present in the stored case data."
+
+
+def draw_header_footer(canvas, document):
+    canvas.saveState()
+    w, h = A4
+    canvas.setFillColor(NAVY)
+    canvas.rect(0, h - 24 * mm, w, 24 * mm, fill=1, stroke=0)
+    canvas.setFillColor(RED)
+    canvas.rect(0, h - 24 * mm, 5 * mm, 24 * mm, fill=1, stroke=0)
+    canvas.setFillColor(NAVY)
+    canvas.rect(0, 0, w, 13 * mm, fill=1, stroke=0)
+    canvas.setFillColor(WHITE)
+    canvas.setFont("Helvetica-Bold", 10)
+    canvas.drawString(18 * mm, h - 10 * mm, "MailGuard")
+    canvas.setFont("Helvetica", 7)
+    canvas.setFillColor(colors.HexColor("#C9D2E1"))
+    canvas.drawString(18 * mm, h - 16 * mm, "EMAIL THREAT DETECTION  •  SECURITY REPORT")
+    canvas.setFillColor(WHITE)
+    canvas.setFont("Helvetica-Bold", 7)
+    canvas.drawString(18 * mm, 5.2 * mm, "MailGuard  /  REPORT GENERATION")
+    canvas.setFont("Helvetica", 7)
+    canvas.drawRightString(192 * mm, 5.2 * mm, f"PAGE {document.page}")
+    canvas.restoreState()
+
+
+def build_case_pdf(case: dict) -> bytes:
+    s = styles()
+    buf = BytesIO()
+
+    doc = SimpleDocTemplate(
+        buf, pagesize=A4,
+        rightMargin=15 * mm, leftMargin=15 * mm,
+        topMargin=31 * mm, bottomMargin=18 * mm,
+        title="MailGuard Security Report",
+        author="MailGuard",
+        subject="Email Threat Detection and Forensic Intelligence Report",
     )
-    ai_top.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), PURPLE_SOFT),
-        ("BOX", (0, 0), (-1, -1), 0.7, colors.HexColor("#D9C9FF")),
+
+    case_id = case.get("caseId", "UNASSIGNED")
+    score = case.get("riskScore", 0)
+    severity = case.get("severity", "")
+    analyzed_at = case.get("analyzedAt", "")
+    case_hash = case.get("caseHash", "")
+    previous_hash = case.get("previousHash")
+
+    checks = case.get("headerChecks") or {}
+    ai = case.get("aiSignals") or {}
+    origin = case.get("origin") or {}
+    analysis = case.get("analysis") or {}
+    metadata = analysis.get("metadata") or {}
+    urls = analysis.get("urls") or []
+    attachments = analysis.get("attachments") or []
+    dashboard = case.get("dashboard") or {}
+    trace = case.get("origin_trace") or {}
+    related = case.get("relatedCases") or []
+
+    fg, bg, verdict = severity_palette(severity or score)
+    findings = collect_findings(case, trace)
+    action, action_fg, action_bg, action_text = recommendation(score, findings)
+    summary = ai.get("summary") or (
+        f"MailGuard assigned a risk score of {score}/100. "
+        f"The message contains {len(findings)} recorded security finding(s), "
+        f"{len(urls)} extracted URL(s), and {len(attachments)} attachment(s)."
+    )
+
+    story = [Spacer(1, 3 * mm)]
+
+    # Header
+    header = Table([[
+        [
+            Paragraph('<font color="#DC2626" size="8"><b>CONFIDENTIAL</b></font>', s["Small"]),
+            Spacer(1, 1.5 * mm),
+            Paragraph("MAILGUARD", s["ReportTitle"]),
+            Paragraph("SECURITY REPORT", s["ReportTitle"]),
+        ],
+        [
+            Paragraph("CASE", s["Label"]),
+            Paragraph(f"<b>{esc(case_id)}</b>", s["Body"]),
+            Spacer(1, 1.5 * mm),
+            Paragraph("DATE", s["Label"]),
+            Paragraph(esc(format_date(analyzed_at)), s["Value"]),
+            Spacer(1, 1.5 * mm),
+            Paragraph("VERDICT", s["Label"]),
+            badge(verdict, fg, bg, s, 44 * mm),
+        ],
+    ]], colWidths=[113 * mm, 67 * mm])
+    header.setStyle(TableStyle([
+        ("BOX", (0, 0), (-1, -1), 0.7, LINE),
+        ("LINEBEFORE", (0, 0), (0, 0), 4, RED),
+        ("BACKGROUND", (1, 0), (1, 0), LIGHT),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 11),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 11),
+        ("TOPPADDING", (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+    ]))
+    story += [header, Spacer(1, 5 * mm)]
+
+    # Risk score
+    risk = Table([[
+        Paragraph("RISK SCORE", s["Label"]),
+        Paragraph(
+            f'<font color="{fg.hexval()}" size="24"><b>{esc(score)}</b></font>'
+            '<font color="#687386" size="9"> / 100</font>',
+            s["Body"],
+        ),
+    ]], colWidths=[45 * mm, 135 * mm])
+    risk.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), LIGHT_BLUE),
+        ("BOX", (0, 0), (-1, -1), 0.6, LINE),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("LEFTPADDING", (0, 0), (-1, -1), 10),
         ("RIGHTPADDING", (0, 0), (-1, -1), 10),
-        ("TOPPADDING", (0, 0), (-1, -1), 9),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
-    ]))
-    story.append(ai_top)
-    story.append(Spacer(1, 3 * mm))
-
-    ai_summary_box = Table(
-        [[
-            Paragraph("AI ANALYSIS SUMMARY", styles["Label"]),
-            Paragraph(esc(ai_summary) if ai_summary else "No AI summary available.", styles["Body"]),
-        ]],
-        colWidths=[42 * mm, 138 * mm],
-    )
-    ai_summary_box.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#FAF8FF")),
-        ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#D9C9FF")),
-        ("LINEBEFORE", (0, 0), (0, -1), 3, PURPLE),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 9),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 9),
         ("TOPPADDING", (0, 0), (-1, -1), 8),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
     ]))
-    story.append(ai_summary_box)
-    story.append(Spacer(1, 6 * mm))
+    story += [risk, Spacer(1, 7 * mm)]
 
-    # ------------------------------------------------------------
-    # 05. Origin & attribution
-    # ------------------------------------------------------------
-    story.append(section_heading("05", "ORIGIN & ATTRIBUTION", styles, colors.HexColor("#EA580C")))
+    # 1. Executive Summary
+    story += [section_heading("01", "EXECUTIVE SUMMARY", s, BLUE)]
+    summary_box = Table([[Paragraph(esc(summary), s["Body"])]], colWidths=[180 * mm])
+    summary_box.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), LIGHT_BLUE),
+        ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#C9D8F7")),
+        ("LINEBEFORE", (0, 0), (0, -1), 4, BLUE),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+        ("TOPPADDING", (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+    ]))
+    story += [summary_box, Spacer(1, 6 * mm)]
 
-    is_vpn = origin.get("isVpnOrHosting", False)
-    vpn_fg, vpn_bg = (RED, RED_SOFT) if is_vpn else (GREEN, GREEN_SOFT)
+    # 2. Email Information
+    story += [section_heading("02", "EMAIL INFORMATION", s, CYAN)]
+    story += [kv([
+        ("From", metadata.get("from") or ""),
+        ("To", metadata.get("to") or ""),
+        ("Reply-To", metadata.get("reply_to") or ""),
+        ("Subject", metadata.get("subject") or ""),
+        ("Date", metadata.get("date") or ""),
+        ("Message-ID", metadata.get("message_id") or ""),
+        ("Return-Path", metadata.get("return_path") or ""),
+    ], s, CYAN), Spacer(1, 6 * mm)]
 
-    lat = origin.get("lat")
-    lng = origin.get("lng")
-    coords = f"{lat}, {lng}" if lat is not None and lng is not None else "—"
-
-    origin_table = Table(
-        [[
-            P("ORIGIN IP", styles, "Label"),
-            P("COUNTRY / CITY", styles, "Label"),
-            P("COORDINATES", styles, "Label"),
-            P("VPN / HOSTING", styles, "Label"),
-        ], [
-            Paragraph(esc(origin.get("ip", "")), styles["Value"]),
-            Paragraph(esc(f"{origin.get('country') or '—'} / {origin.get('city') or '—'}"), styles["Value"]),
-            Paragraph(esc(coords), styles["Value"]),
-            badge("YES" if is_vpn else "NO", vpn_fg, vpn_bg, styles, width=20 * mm),
-        ]],
-        colWidths=[45 * mm, 55 * mm, 40 * mm, 40 * mm],
-    )
-    origin_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), LIGHT),
-        ("BOX", (0, 0), (-1, -1), 0.7, LINE),
-        ("LINEBELOW", (0, 0), (-1, 0), 0.5, LINE),
+    # 3. Authentication
+    story += [section_heading("03", "AUTHENTICATION", s, GREEN)]
+    auth_rows = [[Paragraph("CHECK", s["TH"]), Paragraph("RESULT", s["TH"]),
+                  Paragraph("ASSESSMENT", s["TH"])]]
+    for name, value, assessment in [
+        ("SPF", checks.get("spf", "none"), "Sender authorization result."),
+        ("DKIM", checks.get("dkim", "none"), "Message signature verification."),
+        ("DMARC", checks.get("dmarc", "none"), "Domain authentication / alignment."),
+        ("Domain",
+         "MISMATCH" if checks.get("senderDomainMismatch") else "MATCH",
+         "From-domain vs. Reply-To domain."),
+    ]:
+        auth_rows.append([
+            P(name, s, "TB"),
+            auth_badge(value, s) if name != "Domain" else (
+                badge("MISMATCH", RED, RED_SOFT, s, 27 * mm)
+                if checks.get("senderDomainMismatch")
+                else badge("MATCH", GREEN, GREEN_SOFT, s, 27 * mm)
+            ),
+            P(assessment, s, "TB"),
+        ])
+    auth_table = Table(auth_rows, colWidths=[44 * mm, 36 * mm, 100 * mm], repeatRows=1)
+    auth_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), NAVY),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 8),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-        ("TOPPADDING", (0, 0), (-1, -1), 8),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("LINEBELOW", (0, 0), (-1, -1), 0.45, LINE),
+        ("LEFTPADDING", (0, 0), (-1, -1), 7),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
     ]))
-    story.append(origin_table)
-    story.append(Spacer(1, 6 * mm))
+    story += [auth_table, Spacer(1, 6 * mm)]
 
-    # ------------------------------------------------------------
-    # 06. Related cases
-    # ------------------------------------------------------------
-    story.append(section_heading("06", "RELATED CASES", styles, BLUE))
-
-    if related_cases:
-        data = [[
-            Paragraph("CASE ID", styles["TableHeader"]),
-            Paragraph("SIMILARITY", styles["TableHeader"]),
-            Paragraph("MATCHED ON", styles["TableHeader"]),
-        ]]
-        for related in related_cases:
-            similarity = related.get("similarity", 0)
-            try:
-                similarity = f"{float(similarity):.2f}"
-            except (TypeError, ValueError):
-                similarity = str(similarity)
-            matched_on = ", ".join(related.get("matchedOn") or [])
-            data.append([
-                P(related.get("caseId", ""), styles, "TableBody"),
-                P(similarity, styles, "TableBody"),
-                P(matched_on, styles, "TableBody"),
-            ])
-
-        related_table = Table(data, colWidths=[50 * mm, 35 * mm, 95 * mm], repeatRows=1)
-        related_commands = [
-            ("BACKGROUND", (0, 0), (-1, 0), NAVY),
-            ("TEXTCOLOR", (0, 0), (-1, 0), WHITE),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("LINEBELOW", (0, 0), (-1, 0), 0.8, NAVY),
-            ("LINEBELOW", (0, 1), (-1, -1), 0.45, LINE),
-            ("LEFTPADDING", (0, 0), (-1, -1), 7),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 7),
-            ("TOPPADDING", (0, 0), (-1, -1), 7),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
-        ]
-        for i in range(1, len(data)):
-            if i % 2 == 0:
-                related_commands.append(("BACKGROUND", (0, i), (-1, i), colors.HexColor("#FAFBFC")))
-        related_table.setStyle(TableStyle(related_commands))
-        story.append(related_table)
-    else:
-        empty = Table(
-            [[
-                Paragraph("NO RELATED CASES FOUND", styles["Value"]),
-                Paragraph("No matching historical case records were found.", styles["Small"]),
-            ]],
-            colWidths=[55 * mm, 125 * mm],
-        )
-        empty.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, -1), LIGHT),
-            ("BOX", (0, 0), (-1, -1), 0.6, LINE),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 9),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 9),
-            ("TOPPADDING", (0, 0), (-1, -1), 9),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
-        ]))
-        story.append(empty)
-
-    story.append(Spacer(1, 6 * mm))
-
-    # ------------------------------------------------------------
-    # 07. Case integrity
-    # ------------------------------------------------------------
-    story.append(section_heading("07", "CASE INTEGRITY", styles, NAVY))
-    story.append(key_value_table(
-        [
-            ("Previous Case Hash", previous_hash or "— (first case in chain)"),
-            ("Current Case Hash", case_hash),
-            ("Integrity Model", "Hash-chained case record (tamper-evident record chain)"),
-        ],
-        styles, NAVY,
-    ))
-    story.append(Spacer(1, 6 * mm))
-
-    # ------------------------------------------------------------
-    # 08. Analyst conclusion
-    # ------------------------------------------------------------
-    story.append(section_heading("08", "ANALYST CONCLUSION", styles, RED))
-
-    conclusion = (
-        f"The analyzed email received a fraud risk score of "
-        f"{esc(risk_score)}/100 and was classified as "
-        f"<b>{esc(severity_label)}</b>. This report consolidates "
-        f"authentication checks, AI content signals, origin information, "
-        f"related-case matches, and case-integrity information."
+    # 4. Origin & Route Analysis
+    story += [section_heading("04", "ORIGIN & ROUTE ANALYSIS", s, ORANGE)]
+    first_public = next(
+        (h for h in trace.get("hops") or [] if h.get("ip") and not h.get("internal")),
+        None,
     )
-    conclusion_box = Table([[Paragraph(conclusion, styles["Body"])]], colWidths=[180 * mm])
-    conclusion_box.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#FFF7F7")),
-        ("BOX", (0, 0), (-1, -1), 0.7, colors.HexColor("#F3C1C1")),
-        ("LINEBEFORE", (0, 0), (0, -1), 4, RED),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    first_blacklist = (first_public or {}).get("blacklist") or {}
+    abuse = first_blacklist.get("abuse_score")
+    if abuse is None:
+        abuse = origin.get("abuse_score")
+    story += [kv([
+        ("Origin IP", origin.get("ip") or "Not identified"),
+        ("Location", f"{origin.get('city') or '—'} / {origin.get('country') or '—'}"),
+        ("ISP", origin.get("isp") or "—"),
+        ("ASN", origin.get("asn") or "—"),
+        ("rDNS", origin.get("reverse") or origin.get("hostname") or "—"),
+        ("Hosting/VPN", "YES" if origin.get("hosting") or origin.get("proxy") or origin.get("isVpnOrHosting") else "NO"),
+        ("Blacklist", "LISTED" if origin.get("blacklisted") or first_blacklist.get("listed") else "NOT LISTED"),
+        ("Abuse score", abuse if abuse is not None else "—"),
+    ], s, ORANGE)]
+    hops = trace.get("hops") or []
+    if hops:
+        story += [Spacer(1, 4 * mm), Paragraph("RECEIVED HOP TABLE", s["Label"]),
+                  render_hops(hops, s), Spacer(1, 4 * mm),
+                  Paragraph("TRACEMAP — ROUTE", s["Label"]),
+                  render_trace(hops, s)]
+    else:
+        story += [Spacer(1, 4 * mm), kv([("Received route", "No public Received-chain hops were available.")], s, ORANGE)]
+    story += [Spacer(1, 6 * mm)]
+
+    # 5. Security Findings
+    story += [section_heading("05", "SECURITY FINDINGS", s, RED),
+              render_findings(findings, s), Spacer(1, 6 * mm)]
+
+    # 6. URL Analysis
+    story += [section_heading("06", "URL ANALYSIS", s, CYAN),
+              render_urls(urls, dashboard, s), Spacer(1, 6 * mm)]
+
+    # 7. Attachments
+    story += [section_heading("07", "ATTACHMENTS", s, ORANGE),
+              render_attachments(attachments, s), Spacer(1, 6 * mm)]
+
+    # 8. AI / Analyst Explanation
+    story += [section_heading("08", "AI / ANALYST EXPLANATION", s, PURPLE)]
+    exp = Table([[Paragraph(esc(ai.get("summary") or summary), s["Body"])]], colWidths=[180 * mm])
+    exp.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), LIGHT_PURPLE),
+        ("BOX", (0, 0), (-1, -1), 0.7, colors.HexColor("#D9C9FF")),
+        ("LINEBEFORE", (0, 0), (0, -1), 4, PURPLE),
         ("LEFTPADDING", (0, 0), (-1, -1), 11),
         ("RIGHTPADDING", (0, 0), (-1, -1), 11),
         ("TOPPADDING", (0, 0), (-1, -1), 11),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 11),
     ]))
-    story.append(conclusion_box)
-    story.append(Spacer(1, 4 * mm))
+    story += [exp, Spacer(1, 6 * mm)]
 
-    note = Table(
-        [[
-            Paragraph("<b>SECURITY NOTE</b>", styles["Label"]),
-            Paragraph("Email-derived values are treated as untrusted data and rendered as escaped plain text.", styles["Small"]),
-        ]],
-        colWidths=[32 * mm, 148 * mm],
-    )
-    note.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), LIGHT),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 8),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-        ("TOPPADDING", (0, 0), (-1, -1), 7),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
-        ("BOX", (0, 0), (-1, -1), 0.5, LINE),
+    # 9. Recommended Action
+    story += [section_heading("09", "RECOMMENDED ACTION", s, action_fg)]
+    action_box = Table([[
+        badge(action, action_fg, action_bg, s, 55 * mm),
+        Paragraph(esc(action_text), s["Body"]),
+    ]], colWidths=[60 * mm, 120 * mm])
+    action_box.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), action_bg),
+        ("BOX", (0, 0), (-1, -1), 0.7, action_fg),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 9),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 9),
+        ("TOPPADDING", (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
     ]))
-    story.append(note)
+    story += [action_box, Spacer(1, 6 * mm)]
 
-    document.build(story, onFirstPage=draw_background, onLaterPages=draw_background)
+    # 10. Forensic / Audit Data
+    story += [section_heading("10", "FORENSIC / AUDIT DATA", s, NAVY),
+              kv([
+                  ("Case ID", case_id),
+                  ("Related Cases", len(related)),
+                  ("Case Hash", case_hash or "—"),
+                  ("Previous Hash", previous_hash or "—"),
+                  ("Analysis Timestamp", format_date(analyzed_at)),
+                  ("Received Hop Count", len(hops)),
+                  ("Finding Count", len(findings)),
+                  ("URL Count", len(urls)),
+                  ("Attachment Count", len(attachments)),
+              ], s, NAVY),
+              Spacer(1, 4 * mm),
+              Paragraph(
+                  "Security note: email-derived values are rendered as escaped text. "
+                  "IP geolocation is approximate, and external reputation results may be unavailable "
+                  "when they were not stored with the case.",
+                  s["Small"]
+              )]
 
-    pdf_buffer.seek(0)
-    return pdf_buffer.read()
+    doc.build(story, onFirstPage=draw_header_footer, onLaterPages=draw_header_footer)
+    buf.seek(0)
+    return buf.read()
