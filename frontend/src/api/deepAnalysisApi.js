@@ -1,17 +1,26 @@
 /**
- * Client for the /deep-analysis/* endpoints (backend/app/api/deep_analysis.py).
+ * Client for the /deep-analysis/* endpoints.
  *
- * These back the "Deep analyze" buttons that live directly on the existing
- * data cards (Extracted links, Detected attachments) instead of a separate
- * manual-entry panel -- the link/attachment is already known from the case,
- * so the user shouldn't have to paste or re-pick anything.
+ * Deep analysis is performed by the backend. The frontend only sends the
+ * already-known URL, domain, or case attachment reference and renders the
+ * returned analysis result.
  */
 
 import { apiFetch, BASE_URL } from "./client";
 
-// One AI-analyzed link/attachment/domain result.
-// { option: string, result: object, explanation: string | null }
-
+/**
+ * Analyze a URL.
+ *
+ * Backend:
+ * POST /deep-analysis/link
+ *
+ * Returns:
+ * {
+ *   option: string,
+ *   result: object,
+ *   explanation: string | null
+ * }
+ */
 export function analyzeLink(url) {
   return apiFetch("/deep-analysis/link", {
     method: "POST",
@@ -20,6 +29,12 @@ export function analyzeLink(url) {
   });
 }
 
+/**
+ * Analyze a domain.
+ *
+ * Backend:
+ * POST /deep-analysis/domain
+ */
 export function analyzeDomain(domain) {
   return apiFetch("/deep-analysis/domain", {
     method: "POST",
@@ -28,77 +43,120 @@ export function analyzeDomain(domain) {
   });
 }
 
-// Fetches the page's raw HTML *server-side* and hands it back as text --
-// the browser never connects to the (possibly malicious) URL directly.
-// Expected shape: { html: string, final_url: string, status_code: number }.
-// Backend contract (not yet implemented as of this frontend change):
-//   GET /deep-analysis/page-source?url=<url>
-// This is deliberately a separate call from analyzeLink/streamAnalyzeLink
-// -- fetching the full HTML body is comparatively heavy, so it only
-// happens when someone actually asks to preview the page, not on every
-// deep analysis run.
+/**
+ * Fetch page source through the backend.
+ *
+ * The browser does not directly request the potentially unsafe URL.
+ *
+ * Backend:
+ * GET /deep-analysis/page-source?url=<url>
+ */
 export function fetchPageSource(url) {
-  return apiFetch(`/deep-analysis/page-source?${new URLSearchParams({ url }).toString()}`);
-}
-
-// Re-extracts the attachment straight from the case's stored .eml on the
-// backend -- no re-upload from the browser needed.
-export function analyzeCaseAttachment(caseId, index) {
-  return apiFetch(`/deep-analysis/case/${caseId}/attachment/${index}`, {
-    method: "POST",
-  });
+  return apiFetch(
+    `/deep-analysis/page-source?${new URLSearchParams({ url }).toString()}`
+  );
 }
 
 /**
- * Live-updating versions of analyzeLink/analyzeDomain, backed by the
- * /deep-analysis/{link,domain}/stream SSE endpoints. Each of the ~12
- * checks (WHOIS, Safe Browsing, urlscan, VirusTotal, ...) calls
- * onSource() the instant that ONE check finishes, well before the
- * slowest one is done -- this is what lets the modal fill in live
- * instead of showing a single spinner for 15-25s.
+ * Analyze an attachment belonging to an already analyzed email case.
  *
- * callbacks:
- *   onSource(payload)  -- payload = { key, ...that source's raw result }
- *   onDone(payload)    -- payload = { verdict, sources, explanation, url, domain }
- *   onError(message)
+ * The backend extracts the attachment directly from the stored .eml file.
  *
- * Returns a close() function -- call it if the modal is dismissed
- * mid-stream, so the browser drops the open connection.
+ * Backend:
+ * POST /deep-analysis/case/{caseId}/attachment/{index}
+ *
+ * The backend determines the attachment type and currently supports:
+ * - PDF
+ * - Image attachments
+ *
+ * For PDFs, the backend runs the complete PDF analyzer and returns the
+ * complete PDF analysis result, including the generated URL analysis.
  */
-function _streamViaEventSource(path, params, { onSource, onDone, onError }) {
+export function analyzeCaseAttachment(caseId, index) {
+  if (!caseId) {
+    return Promise.reject(new Error("Missing case ID."));
+  }
+
+  if (index === undefined || index === null) {
+    return Promise.reject(new Error("Missing attachment index."));
+  }
+
+  return apiFetch(
+    `/deep-analysis/case/${encodeURIComponent(caseId)}/attachment/${index}`,
+    {
+      method: "POST",
+    }
+  );
+}
+
+/**
+ * Internal helper for Server-Sent Event based deep analysis.
+ *
+ * The stream emits:
+ *
+ * source:
+ *   { key, ...sourceResult }
+ *
+ * done:
+ *   { verdict, sources, explanation, url, domain }
+ *
+ * This is used for URL/domain analysis so individual checks can appear
+ * progressively in the UI.
+ */
+function _streamViaEventSource(
+  path,
+  params,
+  { onSource, onDone, onError }
+) {
   const query = new URLSearchParams(params).toString();
   const source = new EventSource(`${BASE_URL}${path}?${query}`);
 
   source.addEventListener("source", (event) => {
     try {
-      onSource(JSON.parse(event.data));
+      onSource?.(JSON.parse(event.data));
     } catch {
-      /* ignore a malformed single event -- stream continues */
+      // Ignore malformed individual events and keep the stream alive.
     }
   });
 
   source.addEventListener("done", (event) => {
     try {
-      onDone(JSON.parse(event.data));
+      onDone?.(JSON.parse(event.data));
     } catch {
-      onError("Could not parse the final analysis result.");
+      onError?.("Could not parse the final analysis result.");
     } finally {
       source.close();
     }
   });
 
   source.onerror = () => {
-    onError("Connection to the analyzer stream was lost.");
+    onError?.("Connection to the analyzer stream was lost.");
     source.close();
   };
 
-  return () => source.close();
+  return () => {
+    source.close();
+  };
 }
 
+/**
+ * Stream URL analysis.
+ */
 export function streamAnalyzeLink(url, callbacks) {
-  return _streamViaEventSource("/deep-analysis/link/stream", { url }, callbacks);
+  return _streamViaEventSource(
+    "/deep-analysis/link/stream",
+    { url },
+    callbacks
+  );
 }
 
+/**
+ * Stream domain analysis.
+ */
 export function streamAnalyzeDomain(domain, callbacks) {
-  return _streamViaEventSource("/deep-analysis/domain/stream", { domain }, callbacks);
+  return _streamViaEventSource(
+    "/deep-analysis/domain/stream",
+    { domain },
+    callbacks
+  );
 }

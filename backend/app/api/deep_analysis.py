@@ -26,6 +26,7 @@ way, so this page keeps working even without Groq wired up.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import tempfile
 from pathlib import Path
@@ -35,7 +36,7 @@ from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from app.ai_analyzers.url_analyzer.analyzer import analyze_url_stream
+from app.ai_analyzers.url_analyzer.analyzer import analyze_url, analyze_url_stream
 from app.ai_analyzers.url_analyzer.crawler import fetch_page_source
 from app.core.config import settings
 from app.dispatcher import (
@@ -101,6 +102,71 @@ def _explain(option_id: str, result: dict) -> str | None:
 
     except Exception as error:
         return f"Explanation unavailable: {error}"
+
+
+# A phishing PDF rarely needs more than a couple of malicious links
+# to work -- this caps how many *distinct domains* found in one PDF
+# get the full multi-source treatment, so one attachment can't burn
+# through rate-limited quotas (VirusTotal free tier: 4 req/min) or
+# drag the response out indefinitely.
+MAX_PDF_URLS_TO_ANALYZE = 5
+
+
+def _analyze_url_safe(url: str) -> dict:
+    """analyze_url() is a plain blocking function -- never let an
+    unexpected exception from one URL take down the whole PDF report."""
+    try:
+        return analyze_url(url)
+    except Exception as error:
+        return {"error": str(error), "url": url}
+
+
+async def _analyze_pdf_urls(urls: list[dict]) -> dict:
+    """
+    Runs every URL a PDF attachment contains through the same
+    multi-source analyzer (VirusTotal, Safe Browsing, urlscan, WHOIS,
+    dnstwist, ...) already used by the "Analyze links" deep-analysis
+    option -- so a malicious link hidden inside a PDF gets exactly the
+    same scrutiny as one pasted directly into the email body, instead
+    of just being listed as text.
+
+    `urls` is pdf_analyzer's `result["urls"]` (each item has "url" and
+    "domain"). Dedupes by domain -- WHOIS/dnstwist/crt.sh are already
+    domain-scoped, so re-running them for five different paths on the
+    same domain would just burn quota for no new signal.
+    """
+    if not urls:
+        return {"analyzed": [], "skipped_urls": []}
+
+    seen_domains = set()
+    to_analyze = []
+    skipped = []
+
+    for entry in urls:
+        url = (entry or {}).get("url")
+        domain = (entry or {}).get("domain") or url
+
+        if not url:
+            continue
+
+        if domain in seen_domains or len(to_analyze) >= MAX_PDF_URLS_TO_ANALYZE:
+            skipped.append(url)
+            continue
+
+        seen_domains.add(domain)
+        to_analyze.append(url)
+
+    # analyze_url() is blocking and does its own internal fan-out with
+    # threads, so each call is dispatched to its own worker thread here
+    # too rather than awaited one at a time.
+    reports = await asyncio.gather(
+        *(asyncio.to_thread(_analyze_url_safe, url) for url in to_analyze)
+    )
+
+    return {
+        "analyzed": list(reports),
+        "skipped_urls": skipped,
+    }
 
 
 def _validate_url(raw_url: str) -> str:
@@ -299,9 +365,17 @@ async def deep_analyze_pdf(file: UploadFile = File(...)):
     temp_path = await _save_upload(file, ALLOWED_PDF_EXTENSIONS)
 
     try:
-        result = analyze_pdf_attachment(temp_path)
+        # analyze_pdf_attachment() shells out via subprocess.run() and
+        # blocks for up to SUBPROCESS_TIMEOUT_SECONDS. Calling it directly
+        # here would freeze the whole event loop for that entire window --
+        # no other request (including unrelated ones) could be served in
+        # the meantime. Push it to a worker thread instead.
+        result = await asyncio.to_thread(analyze_pdf_attachment, temp_path)
     finally:
         Path(temp_path).unlink(missing_ok=True)
+
+    if isinstance(result, dict) and "error" not in result:
+        result["url_analysis"] = await _analyze_pdf_urls(result.get("urls", []))
 
     return {
         "option": "analyze_pdf_attachment",
@@ -369,9 +443,19 @@ async def deep_analyze_case_attachment(case_id: str, index: int):
         temp_path = tmp.name
 
     try:
-        result = analyzer(temp_path)
+        # Same event-loop-blocking concern as /pdf-attachment above --
+        # both analyze_pdf_attachment() and analyze_image_attachment()
+        # block on subprocess.run() for up to SUBPROCESS_TIMEOUT_SECONDS.
+        result = await asyncio.to_thread(analyzer, temp_path)
     finally:
         Path(temp_path).unlink(missing_ok=True)
+
+    if (
+        option_id == "analyze_pdf_attachment"
+        and isinstance(result, dict)
+        and "error" not in result
+    ):
+        result["url_analysis"] = await _analyze_pdf_urls(result.get("urls", []))
 
     return {
         "option": option_id,

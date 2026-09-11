@@ -11,6 +11,14 @@ beautifulsoup4
 
 # pdf_analyzer
 pymupdf
+pillow
+pyzbar
+# pyzbar wraps the system `zbar` shared library -- it is NOT pulled in
+# by pip. Install it via the OS package manager, e.g.:
+#   Debian/Ubuntu: apt-get install -y libzbar0
+#   macOS (brew):  brew install zbar
+# Without it, QR_DECODING_AVAILABLE is False and QR-code detection is
+# silently skipped rather than crashing the analyzer.
 
 # whois
 python-whois

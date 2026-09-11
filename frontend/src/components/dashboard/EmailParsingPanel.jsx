@@ -7,7 +7,6 @@ import {
   Link2,
   Paperclip,
   ListChecks,
-  Highlighter,
   CheckCircle2,
   XCircle,
   AlertTriangle,
@@ -35,198 +34,511 @@ import {
   Cell,
 } from "recharts";
 
-import { DashboardPanel, DashboardStat } from "./DashboardWidgets";
-import { DeepAnalyzeTrigger, DeepAnalyzePanel } from "../results/DeepAnalysisResult";
+import {
+  DashboardPanel,
+  DashboardStat,
+} from "./DashboardWidgets";
+
+import {
+  DeepAnalyzeTrigger,
+  DeepAnalyzePanel,
+} from "../results/DeepAnalysisResult";
+
 import { useDeepAnalysis } from "../../hooks/useDeepAnalysis";
-import { streamAnalyzeLink, analyzeCaseAttachment } from "../../api/deepAnalysisApi";
+
+import {
+  streamAnalyzeLink,
+  analyzeCaseAttachment,
+} from "../../api/deepAnalysisApi";
 
 const AUTH_KEYS = ["spf", "dkim", "dmarc"];
 
-// Mirrors backend/app/api/deep_analysis.py's ALLOWED_PDF_EXTENSIONS /
-// ALLOWED_IMAGE_EXTENSIONS -- used to decide whether an attachment row
-// even gets a "Deep analyze" button.
-const DEEP_SCANNABLE_EXTENSIONS = new Set([
-  ".pdf",
-  ".jpg",
-  ".jpeg",
-  ".png",
-  ".gif",
-  ".tif",
-  ".tiff",
-  ".bmp",
-  ".webp",
-  ".heic",
-]);
+// Mirrors backend/app/api/deep_analysis.py's
+// ALLOWED_PDF_EXTENSIONS / ALLOWED_IMAGE_EXTENSIONS.
+const DEEP_SCANNABLE_EXTENSIONS =
+  new Set([
+    ".pdf",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".tif",
+    ".tiff",
+    ".bmp",
+    ".webp",
+    ".heic",
+  ]);
 
 function attachmentExtension(item) {
-  if (item.extension) return item.extension.toLowerCase();
-  const name = item.filename || "";
-  const dot = name.lastIndexOf(".");
-  return dot === -1 ? "" : name.slice(dot).toLowerCase();
+  if (item.extension) {
+    return item.extension.toLowerCase();
+  }
+
+  const name =
+    item.filename || "";
+
+  const dot =
+    name.lastIndexOf(".");
+
+  return dot === -1
+    ? ""
+    : name.slice(dot).toLowerCase();
 }
 
 const URLS_PER_PAGE = 6;
 
-// Splits a URL into its host (the part worth scanning first when
-// checking a link's trustworthiness) and the rest (path/query), so the
-// card can put the host on its own line instead of truncating the whole
-// string from the left.
+// Splits a URL into its host and path/query.
 function splitUrl(rawUrl) {
   try {
-    const parsed = new URL(rawUrl);
+    const parsed =
+      new URL(rawUrl);
+
     const rest = `${parsed.pathname}${parsed.search}${parsed.hash}`;
-    return { host: parsed.host, rest: rest === "/" ? "" : rest };
+
+    return {
+      host: parsed.host,
+      rest:
+        rest === "/"
+          ? ""
+          : rest,
+    };
   } catch {
-    return { host: rawUrl, rest: "" };
+    return {
+      host: rawUrl,
+      rest: "",
+    };
   }
 }
 
-function ContentRiskChart({ data }) {
-  const safeData = data.map((item) => ({
-    ...item,
-    total: Number(item.total || 0),
-    suspicious: Number(item.suspicious || 0),
-  }));
+function ContentRiskChart({
+  data,
+}) {
+  const safeData =
+    data.map((item) => ({
+      ...item,
+      total: Number(
+        item.total || 0
+      ),
+      suspicious: Number(
+        item.suspicious || 0
+      ),
+    }));
 
-  const hasAny = safeData.some((d) => d.total > 0);
-  if (!hasAny) return <EmptyBlock text="No URLs, attachments, or header findings were detected." />;
+  const hasAny =
+    safeData.some(
+      (d) => d.total > 0
+    );
+
+  if (!hasAny) {
+    return (
+      <EmptyBlock text="No URLs, attachments, or header findings were detected." />
+    );
+  }
 
   return (
     <div className="ref-analysis-chart-wrap">
       <div className="ref-analysis-chart-title">
         <div>
-          <span>CONTENT EXPOSURE</span>
-          <strong>What the parser found</strong>
+          <span>
+            CONTENT EXPOSURE
+          </span>
+          <strong>
+            What the parser found
+          </strong>
         </div>
+
         <div className="ref-chart-legend">
-          <i className="legend-total" /> Total
-          <i className="legend-suspicious" /> Suspicious
+          <i className="legend-total" />
+          Total
+          <i className="legend-suspicious" />
+          Suspicious
         </div>
       </div>
 
-      <ResponsiveContainer width="100%" height={225}>
-        <BarChart data={safeData} margin={{ top: 14, right: 8, left: -20, bottom: 4 }} barGap={7}>
-          <CartesianGrid vertical={false} stroke="rgba(38,58,67,.08)" strokeDasharray="4 5" />
-          <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#718087" }} axisLine={false} tickLine={false} />
-          <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: "#8b969b" }} axisLine={false} tickLine={false} />
-          <Tooltip
-            cursor={{ fill: "rgba(85,174,181,.06)" }}
-            contentStyle={{ borderRadius: 10, border: "1px solid #d9e3e5", boxShadow: "0 8px 24px rgba(35,55,61,.10)" }}
+      <ResponsiveContainer
+        width="100%"
+        height={225}
+      >
+        <BarChart
+          data={safeData}
+          margin={{
+            top: 14,
+            right: 8,
+            left: -20,
+            bottom: 4,
+          }}
+          barGap={7}
+        >
+          <CartesianGrid
+            vertical={false}
+            stroke="rgba(38,58,67,.08)"
+            strokeDasharray="4 5"
           />
-          <Bar dataKey="total" name="Total" fill="#9fc3d8" radius={[7, 7, 2, 2]} />
-          <Bar dataKey="suspicious" name="Suspicious" fill="#df7469" radius={[7, 7, 2, 2]} />
+
+          <XAxis
+            dataKey="name"
+            tick={{
+              fontSize: 11,
+              fill: "#718087",
+            }}
+            axisLine={false}
+            tickLine={false}
+          />
+
+          <YAxis
+            allowDecimals={false}
+            tick={{
+              fontSize: 10,
+              fill: "#8b969b",
+            }}
+            axisLine={false}
+            tickLine={false}
+          />
+
+          <Tooltip
+            cursor={{
+              fill: "rgba(85,174,181,.06)",
+            }}
+            contentStyle={{
+              borderRadius: 10,
+              border:
+                "1px solid #d9e3e5",
+              boxShadow:
+                "0 8px 24px rgba(35,55,61,.10)",
+            }}
+          />
+
+          <Bar
+            dataKey="total"
+            name="Total"
+            fill="#9fc3d8"
+            radius={[
+              7,
+              7,
+              2,
+              2,
+            ]}
+          />
+
+          <Bar
+            dataKey="suspicious"
+            name="Suspicious"
+            fill="#df7469"
+            radius={[
+              7,
+              7,
+              2,
+              2,
+            ]}
+          />
         </BarChart>
       </ResponsiveContainer>
     </div>
   );
 }
 
-function normaliseAuthValue(value) {
-  const normalized = String(value || "").trim().toLowerCase();
-  if (normalized === "pass") return "pass";
-  if (normalized === "fail") return "fail";
+function normaliseAuthValue(
+  value
+) {
+  const normalized = String(
+    value || ""
+  )
+    .trim()
+    .toLowerCase();
+
+  if (
+    normalized === "pass"
+  ) {
+    return "pass";
+  }
+
+  if (
+    normalized === "fail"
+  ) {
+    return "fail";
+  }
+
   return "unknown";
 }
 
-function AuthChart({ checks, analysis }) {
-  const authentication = analysis?.authentication || {};
+function AuthChart({
+  checks,
+  analysis,
+}) {
+  const authentication =
+    analysis?.authentication ||
+    {};
 
-  // Prefer the API's normalized headerChecks, but fall back to the detailed
-  // parser authentication object when a field is missing.
-  const auth = Object.fromEntries(
-    AUTH_KEYS.map((key) => {
-      const fallback = authentication?.[key]?.result;
-      return [key, normaliseAuthValue(checks?.[key] ?? fallback)];
-    })
-  );
+  const auth =
+    Object.fromEntries(
+      AUTH_KEYS.map((key) => {
+        const fallback =
+          authentication?.[key]
+            ?.result;
 
-  const pass = AUTH_KEYS.filter((key) => auth[key] === "pass").length;
-  const fail = AUTH_KEYS.filter((key) => auth[key] === "fail").length;
-  const unknown = AUTH_KEYS.length - pass - fail;
-  const known = pass + fail;
+        return [
+          key,
+          normaliseAuthValue(
+            checks?.[key] ??
+              fallback
+          ),
+        ];
+      })
+    );
+
+  const pass =
+    AUTH_KEYS.filter(
+      (key) =>
+        auth[key] === "pass"
+    ).length;
+
+  const fail =
+    AUTH_KEYS.filter(
+      (key) =>
+        auth[key] === "fail"
+    ).length;
+
+  const unknown =
+    AUTH_KEYS.length -
+    pass -
+    fail;
+
+  const known =
+    pass + fail;
 
   const data = [
-    { name: "Passed", value: pass },
-    { name: "Failed", value: fail },
-    { name: "Not checked", value: unknown },
-  ].filter((x) => x.value > 0);
+    {
+      name: "Passed",
+      value: pass,
+    },
+    {
+      name: "Failed",
+      value: fail,
+    },
+    {
+      name: "Not checked",
+      value: unknown,
+    },
+  ].filter(
+    (x) => x.value > 0
+  );
 
-  // Unknown authentication must NOT make a message look like a 0% result.
-  // A percentage is only meaningful when the email actually contains an
-  // authentication result.
-  const score = known ? Math.round((pass / known) * 100) : null;
+  const score = known
+    ? Math.round(
+        (pass / known) * 100
+      )
+    : null;
 
   return (
     <div className="ref-auth-visual">
       <div className="ref-auth-donut">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer
+          width="100%"
+          height="100%"
+        >
           <PieChart>
-            <Pie data={data} dataKey="value" nameKey="name" innerRadius="68%" outerRadius="92%" paddingAngle={3} stroke="none">
-              {data.map((entry) => (
-                <Cell key={entry.name} fill={entry.name === "Passed" ? "#56a98a" : entry.name === "Failed" ? "#df7469" : "#cbd5d8"} />
-              ))}
+            <Pie
+              data={data}
+              dataKey="value"
+              nameKey="name"
+              innerRadius="68%"
+              outerRadius="92%"
+              paddingAngle={3}
+              stroke="none"
+            >
+              {data.map(
+                (entry) => (
+                  <Cell
+                    key={
+                      entry.name
+                    }
+                    fill={
+                      entry.name ===
+                      "Passed"
+                        ? "#56a98a"
+                        : entry.name ===
+                          "Failed"
+                        ? "#df7469"
+                        : "#cbd5d8"
+                    }
+                  />
+                )
+              )}
             </Pie>
           </PieChart>
         </ResponsiveContainer>
+
         <div className="ref-auth-donut-center">
-          <strong>{score === null ? "—" : `${score}%`}</strong>
-          <span>{known ? `${known}/3 checked` : "not available"}</span>
+          <strong>
+            {score === null
+              ? "—"
+              : `${score}%`}
+          </strong>
+
+          <span>
+            {known
+              ? `${known}/3 checked`
+              : "not available"}
+          </span>
         </div>
       </div>
 
       <div className="ref-auth-breakdown">
-        {AUTH_KEYS.map((key) => {
-          const value = auth[key];
-          const failed = value === "fail";
-          const passed = value === "pass";
-          return (
-            <div className="ref-auth-breakdown-row" key={key}>
-              <span className={`ref-auth-dot ${failed ? "fail" : passed ? "pass" : "unknown"}`} />
-              <b>{key.toUpperCase()}</b>
-              <span>{value === "unknown" ? "not checked" : value}</span>
-            </div>
-          );
-        })}
+        {AUTH_KEYS.map(
+          (key) => {
+            const value =
+              auth[key];
+
+            const failed =
+              value === "fail";
+
+            const passed =
+              value === "pass";
+
+            return (
+              <div
+                className="ref-auth-breakdown-row"
+                key={key}
+              >
+                <span
+                  className={`ref-auth-dot ${
+                    failed
+                      ? "fail"
+                      : passed
+                      ? "pass"
+                      : "unknown"
+                  }`}
+                />
+
+                <b>
+                  {key.toUpperCase()}
+                </b>
+
+                <span>
+                  {value ===
+                  "unknown"
+                    ? "not checked"
+                    : value}
+                </span>
+              </div>
+            );
+          }
+        )}
       </div>
     </div>
   );
 }
 
-function MetadataGrid({ metadata }) {
+function MetadataGrid({
+  metadata,
+}) {
   const fields = [
-    ["Subject", metadata.subject, Mail],
-    ["From", metadata.from, UserRound],
-    ["To", metadata.to, UserRound],
-    ["Date", metadata.date, Clock3],
-    ["Reply-To", metadata.reply_to, Mail],
-    ["Return-Path", metadata.return_path, Mail],
-    ["Message-ID", metadata.message_id, ListChecks],
-    ["Originating IP", metadata.x_originating_ip, Globe2],
+    [
+      "Subject",
+      metadata.subject,
+      Mail,
+    ],
+    [
+      "From",
+      metadata.from,
+      UserRound,
+    ],
+    [
+      "To",
+      metadata.to,
+      UserRound,
+    ],
+    [
+      "Date",
+      metadata.date,
+      Clock3,
+    ],
+    [
+      "Reply-To",
+      metadata.reply_to,
+      Mail,
+    ],
+    [
+      "Return-Path",
+      metadata.return_path,
+      Mail,
+    ],
+    [
+      "Message-ID",
+      metadata.message_id,
+      ListChecks,
+    ],
+    [
+      "Originating IP",
+      metadata.x_originating_ip,
+      Globe2,
+    ],
   ];
 
   return (
     <div className="ref-meta-grid">
-      {fields.map(([label, value, Icon]) => (
-        <div className="ref-meta-card" key={label}>
-          <div className="ref-meta-icon"><Icon size={14} /></div>
-          <div>
-            <span>{label}</span>
-            <strong title={value || "—"}>{value || "—"}</strong>
+      {fields.map(
+        ([
+          label,
+          value,
+          Icon,
+        ]) => (
+          <div
+            className="ref-meta-card"
+            key={label}
+          >
+            <div className="ref-meta-icon">
+              <Icon size={14} />
+            </div>
+
+            <div>
+              <span>
+                {label}
+              </span>
+
+              <strong
+                title={
+                  value || "—"
+                }
+              >
+                {value || "—"}
+              </strong>
+            </div>
           </div>
-        </div>
-      ))}
+        )
+      )}
     </div>
   );
 }
 
-function EmptyBlock({ text }) {
-  return <p className="ref-empty-inline ref-analysis-empty-note">{text}</p>;
+function EmptyBlock({
+  text,
+}) {
+  return (
+    <p className="ref-empty-inline ref-analysis-empty-note">
+      {text}
+    </p>
+  );
 }
 
-export default function EmailParsingPanel({ currentCase }) {
-  const navigate = useNavigate();
-  const { state: deepState, run: runDeep, runStream: runDeepStream, clear: clearDeep } = useDeepAnalysis();
-  const [urlPage, setUrlPage] = useState(1);
+export default function EmailParsingPanel({
+  currentCase,
+}) {
+  const navigate =
+    useNavigate();
+
+  const {
+    state: deepState,
+    run: runDeep,
+    runStream:
+      runDeepStream,
+    clear: clearDeep,
+  } = useDeepAnalysis();
+
+  const [
+    urlPage,
+    setUrlPage,
+  ] = useState(1);
 
   useEffect(() => {
     setUrlPage(1);
@@ -240,189 +552,738 @@ export default function EmailParsingPanel({ currentCase }) {
     );
   }
 
-  const analysis = currentCase.analysis || {};
-  const metadata = analysis.metadata || {};
-  const hc = currentCase.headerChecks || {};
-  const urls = analysis.urls || [];
-  const urlPageCount = Math.max(1, Math.ceil(urls.length / URLS_PER_PAGE));
-  const urlPageSafe = Math.min(urlPage, urlPageCount);
-  const pagedUrls = urls.slice((urlPageSafe - 1) * URLS_PER_PAGE, urlPageSafe * URLS_PER_PAGE);
-  const attachments = analysis.attachments || [];
-  const headerFindings = analysis.header_findings || [];
+  const analysis =
+    currentCase.analysis ||
+    {};
 
-  const contentRisk = currentCase.dashboard?.contentRisk || [
-    { name: "URLs", total: urls.length, suspicious: 0 },
-    { name: "Attachments", total: attachments.length, suspicious: attachments.filter((a) => a.suspicious).length },
-    { name: "Header findings", total: headerFindings.length, suspicious: headerFindings.length },
-  ];
+  const metadata =
+    analysis.metadata ||
+    {};
+
+  const hc =
+    currentCase.headerChecks ||
+    {};
+
+  const urls =
+    analysis.urls || [];
+
+  const urlPageCount =
+    Math.max(
+      1,
+      Math.ceil(
+        urls.length /
+          URLS_PER_PAGE
+      )
+    );
+
+  const urlPageSafe =
+    Math.min(
+      urlPage,
+      urlPageCount
+    );
+
+  const pagedUrls =
+    urls.slice(
+      (urlPageSafe - 1) *
+        URLS_PER_PAGE,
+      urlPageSafe *
+        URLS_PER_PAGE
+    );
+
+  const attachments =
+    analysis.attachments ||
+    [];
+
+  const headerFindings =
+    analysis.header_findings ||
+    [];
+
+  const contentRisk =
+    currentCase.dashboard
+      ?.contentRisk || [
+      {
+        name: "URLs",
+        total: urls.length,
+        suspicious: 0,
+      },
+      {
+        name: "Attachments",
+        total:
+          attachments.length,
+        suspicious:
+          attachments.filter(
+            (a) =>
+              a.suspicious
+          ).length,
+      },
+      {
+        name: "Header findings",
+        total:
+          headerFindings.length,
+        suspicious:
+          headerFindings.length,
+      },
+    ];
 
   const flags = [
-    ...headerFindings.map((f) => ({
-      text: f.type?.replace(/_/g, " ") || "Header anomaly",
-      reason: f.message,
-      level: f.severity === "high" ? "high" : f.severity === "medium" ? "medium" : "low",
-    })),
-    ...attachments.filter((a) => a.suspicious).map((a) => ({
-      text: a.filename || "Attachment",
-      reason: a.reason || "Flagged as a suspicious attachment type.",
-      level: "high",
-    })),
+    ...headerFindings.map(
+      (f) => ({
+        text:
+          f.type?.replace(
+            /_/g,
+            " "
+          ) ||
+          "Header anomaly",
+        reason:
+          f.message,
+        level:
+          f.severity ===
+          "high"
+            ? "high"
+            : f.severity ===
+              "medium"
+            ? "medium"
+            : "low",
+      })
+    ),
+
+    ...attachments
+      .filter(
+        (a) =>
+          a.suspicious
+      )
+      .map((a) => ({
+        text:
+          a.filename ||
+          "Attachment",
+        reason:
+          a.reason ||
+          "Flagged as a suspicious attachment type.",
+        level: "high",
+      })),
   ];
 
-  const severity = currentCase.severity || "yellow";
-  const risk = Number(currentCase.riskScore || 0);
+  const severity =
+    currentCase.severity ||
+    "yellow";
+
+  const risk = Number(
+    currentCase.riskScore ||
+      0
+  );
 
   return (
     <div className="ref-email-analysis-stack">
       <DashboardPanel
         title="Email analysis overview"
-        right={<span className={`ref-analysis-severity severity-${severity}`}>{severity} risk · {risk}%</span>}
+        right={
+          <span
+            className={`ref-analysis-severity severity-${severity}`}
+          >
+            {severity} risk ·{" "}
+            {risk}%
+          </span>
+        }
       >
         <div className="ref-analysis-hero-grid">
-          <div className="ref-analysis-risk-card" data-severity={severity}>
-            <div className="ref-analysis-risk-ring" style={{ "--risk": `${risk}%` }}>
+          <div
+            className="ref-analysis-risk-card"
+            data-severity={
+              severity
+            }
+          >
+            <div
+              className="ref-analysis-risk-ring"
+              style={{
+                "--risk": `${risk}%`,
+              }}
+            >
               <div>
-                <strong>{risk}</strong>
-                <span>/ 100</span>
+                <strong>
+                  {risk}
+                </strong>
+
+                <span>
+                  / 100
+                </span>
               </div>
             </div>
+
             <div>
-              <span className="ref-analysis-overline">THREAT SCORE</span>
-              <h3>{severity === "red" ? "High-risk email" : severity === "green" ? "Low-risk email" : "Needs review"}</h3>
-              <p>{currentCase.verdict || "The parser combined authentication, content and origin signals into this score."}</p>
+              <span className="ref-analysis-overline">
+                THREAT SCORE
+              </span>
+
+              <h3>
+                {severity ===
+                "red"
+                  ? "High-risk email"
+                  : severity ===
+                    "green"
+                  ? "Low-risk email"
+                  : "Needs review"}
+              </h3>
+
+              <p>
+                {currentCase.verdict ||
+                  "The parser combined authentication, content and origin signals into this score."}
+              </p>
             </div>
           </div>
 
           <div className="ref-analysis-auth-card">
-            <div className="ref-analysis-overline">AUTHENTICATION HEALTH</div>
-            <AuthChart checks={hc} analysis={analysis} />
+            <div className="ref-analysis-overline">
+              AUTHENTICATION HEALTH
+            </div>
+
+            <AuthChart
+              checks={hc}
+              analysis={analysis}
+            />
           </div>
         </div>
 
         <div className="ref-parse-stats">
-          <DashboardStat icon={Link2} label="Links found" value={urls.length} />
-          <DashboardStat icon={Paperclip} label="Attachments" value={attachments.length} />
-          <DashboardStat icon={ListChecks} label="Header findings" value={headerFindings.length} />
+          <DashboardStat
+            icon={Link2}
+            label="Links found"
+            value={
+              urls.length
+            }
+          />
+
+          <DashboardStat
+            icon={Paperclip}
+            label="Attachments"
+            value={
+              attachments.length
+            }
+          />
+
+          <DashboardStat
+            icon={ListChecks}
+            label="Header findings"
+            value={
+              headerFindings.length
+            }
+          />
         </div>
       </DashboardPanel>
 
       <DashboardPanel title="Parser telemetry">
-        <ContentRiskChart data={contentRisk} />
+        <ContentRiskChart
+          data={contentRisk}
+        />
       </DashboardPanel>
 
-      <DashboardPanel title="Email metadata" right={<span className="ref-origin-eyebrow-tag">CASE #{currentCase.caseId}</span>}>
-        <MetadataGrid metadata={metadata} />
+      <DashboardPanel
+        title="Email metadata"
+        right={
+          <span className="ref-origin-eyebrow-tag">
+            CASE #
+            {
+              currentCase.caseId
+            }
+          </span>
+        }
+      >
+        <MetadataGrid
+          metadata={metadata}
+        />
       </DashboardPanel>
 
       <div className="ref-grid-two">
-        <DashboardPanel title="Threat indicators" right={<span className="ref-panel-number">{flags.length}</span>}>
+        <DashboardPanel
+          title="Threat indicators"
+          right={
+            <span className="ref-panel-number">
+              {flags.length}
+            </span>
+          }
+        >
           <div className="ref-highlight-list ref-analysis-findings">
-            {flags.length === 0 ? (
+            {flags.length ===
+            0 ? (
               <div className="ref-safe-state">
-                <ShieldCheck size={22} />
-                <div><strong>No flagged indicators</strong><span>No major parser findings were raised for this email.</span></div>
+                <ShieldCheck
+                  size={22}
+                />
+
+                <div>
+                  <strong>
+                    No flagged
+                    indicators
+                  </strong>
+
+                  <span>
+                    No major parser
+                    findings were
+                    raised for this
+                    email.
+                  </span>
+                </div>
               </div>
             ) : (
-              flags.map((item, index) => (
-                <div key={index} className={`ref-analysis-finding level-${item.level}`}>
-                  {item.level === "high" ? <ShieldAlert size={17} /> : <AlertTriangle size={17} />}
-                  <div><strong>{item.text}</strong><span>{item.reason}</span></div>
-                </div>
-              ))
+              flags.map(
+                (
+                  item,
+                  index
+                ) => (
+                  <div
+                    key={
+                      index
+                    }
+                    className={`ref-analysis-finding level-${item.level}`}
+                  >
+                    {item.level ===
+                    "high" ? (
+                      <ShieldAlert
+                        size={
+                          17
+                        }
+                      />
+                    ) : (
+                      <AlertTriangle
+                        size={
+                          17
+                        }
+                      />
+                    )}
+
+                    <div>
+                      <strong>
+                        {
+                          item.text
+                        }
+                      </strong>
+
+                      <span>
+                        {
+                          item.reason
+                        }
+                      </span>
+                    </div>
+                  </div>
+                )
+              )
             )}
           </div>
         </DashboardPanel>
 
-        <DashboardPanel title="Detected attachments" right={<span className="ref-panel-number">{attachments.length}</span>}>
-          {attachments.length === 0 ? (
+        <DashboardPanel
+          title="Detected attachments"
+          right={
+            <span className="ref-panel-number">
+              {
+                attachments.length
+              }
+            </span>
+          }
+        >
+          {attachments.length ===
+          0 ? (
             <EmptyBlock text="No attachments were found in this email." />
           ) : (
             <div className="ref-attachment-list">
-              {attachments.map((item, index) => {
-                const key = `attachment-${index}`;
-                const scannable = DEEP_SCANNABLE_EXTENSIONS.has(attachmentExtension(item));
-                const entry = deepState[key];
-                const run = () => runDeep(key, () => analyzeCaseAttachment(currentCase.caseId, index));
-                const clear = () => clearDeep(key);
+              {attachments.map(
+                (
+                  item,
+                  index
+                ) => {
+                  const key = `attachment-${index}`;
 
-                return (
-                  <div className={`ref-deep-card ${item.suspicious ? "is-suspicious" : ""}`} key={`${item.filename}-${index}`}>
-                    <div className="ref-attachment-row">
-                      <div className="ref-attachment-icon"><Paperclip size={16} /></div>
-                      <div><strong>{item.filename || "Unnamed attachment"}</strong><span>{item.content_type || item.extension || "Unknown type"}{item.size ? ` · ${item.size}` : ""}</span></div>
-                      {item.suspicious && <b>FLAGGED</b>}
-                      {scannable && <DeepAnalyzeTrigger label={item.filename || "attachment"} entry={entry} onRun={run} onClear={clear} />}
+                  const scannable =
+                    DEEP_SCANNABLE_EXTENSIONS.has(
+                      attachmentExtension(
+                        item
+                      )
+                    );
+
+                  const entry =
+                    deepState[
+                      key
+                    ];
+
+                  const run =
+                    () =>
+                      runDeep(
+                        key,
+                        () =>
+                          analyzeCaseAttachment(
+                            currentCase.caseId,
+                            index
+                          )
+                      );
+
+                  const clear =
+                    () =>
+                      clearDeep(
+                        key
+                      );
+
+                  /*
+                   * IMPORTANT:
+                   *
+                   * This is the same real attachment index that is sent to
+                   * analyzeCaseAttachment(currentCase.caseId, index).
+                   *
+                   * We pass that exact index to the full report page so the
+                   * report can call the same backend endpoint again if the
+                   * user re-runs the analysis.
+                   */
+                  const openFullReport =
+                    () => {
+                      navigate(
+                        "/deep-analysis/report",
+                        {
+                          state: {
+                            type: "pdf",
+
+                            caseId:
+                              currentCase.caseId,
+
+                            index,
+
+                            attachment:
+                              {
+                                ...item,
+                                index,
+                              },
+
+                            entry,
+                          },
+                        }
+                      );
+                    };
+
+                  return (
+                    <div
+                      className={`ref-deep-card ${
+                        item.suspicious
+                          ? "is-suspicious"
+                          : ""
+                      }`}
+                      key={`${item.filename}-${index}`}
+                    >
+                      <div className="ref-attachment-row">
+                        <div className="ref-attachment-icon">
+                          <Paperclip
+                            size={
+                              16
+                            }
+                          />
+                        </div>
+
+                        <div>
+                          <strong>
+                            {item.filename ||
+                              "Unnamed attachment"}
+                          </strong>
+
+                          <span>
+                            {item.content_type ||
+                              item.extension ||
+                              "Unknown type"}
+
+                            {item.size
+                              ? ` · ${item.size}`
+                              : ""}
+                          </span>
+                        </div>
+
+                        {item.suspicious && (
+                          <b>
+                            FLAGGED
+                          </b>
+                        )}
+
+                        {scannable && (
+                          <DeepAnalyzeTrigger
+                            label={
+                              item.filename ||
+                              "attachment"
+                            }
+                            entry={
+                              entry
+                            }
+                            onRun={
+                              run
+                            }
+                            onClear={
+                              clear
+                            }
+                          />
+                        )}
+
+                        {scannable &&
+                          entry && (
+                            <button
+                              type="button"
+                              className="ref-deep-expand-btn"
+                              onClick={
+                                openFullReport
+                              }
+                              title="Open the full deep analysis report for this attachment"
+                            >
+                              <Maximize2
+                                size={
+                                  13
+                                }
+                              />
+
+                              Full report
+                            </button>
+                          )}
+                      </div>
+
+                      {scannable && (
+                        <DeepAnalyzePanel
+                          entry={
+                            entry
+                          }
+                          onRun={
+                            run
+                          }
+                          onClear={
+                            clear
+                          }
+                        />
+                      )}
                     </div>
-                    {scannable && <DeepAnalyzePanel entry={entry} onRun={run} onClear={clear} />}
-                  </div>
-                );
-              })}
+                  );
+                }
+              )}
             </div>
           )}
         </DashboardPanel>
       </div>
 
-      <DashboardPanel title="Extracted links" right={<span className="ref-panel-number">{urls.length}</span>}>
-        {urls.length === 0 ? (
+      <DashboardPanel
+        title="Extracted links"
+        right={
+          <span className="ref-panel-number">
+            {urls.length}
+          </span>
+        }
+      >
+        {urls.length ===
+        0 ? (
           <EmptyBlock text="No links were extracted from this email." />
         ) : (
           <div className="ref-url-panel-body">
             <div className="ref-url-grid">
-              {pagedUrls.map((url, pagedIndex) => {
-                const index = (urlPageSafe - 1) * URLS_PER_PAGE + pagedIndex;
-                const key = `url-${index}`;
-                const entry = deepState[key];
-                const run = () => runDeepStream(key, (callbacks) => streamAnalyzeLink(url, callbacks));
-                const clear = () => clearDeep(key);
-                const { host, rest } = splitUrl(url);
+              {pagedUrls.map(
+                (
+                  url,
+                  pagedIndex
+                ) => {
+                  const index =
+                    (urlPageSafe -
+                      1) *
+                      URLS_PER_PAGE +
+                    pagedIndex;
 
-                return (
-                  <div className="ref-url-card" key={`${url}-${index}`}>
-                    <div className="ref-url-card-top">
-                      <div className="ref-url-icon"><Link2 size={14} /></div>
-                      <div className="ref-url-card-text">
-                        <strong title={host}>{host}</strong>
-                        {rest && <span title={rest}>{rest}</span>}
+                  const key = `url-${index}`;
+
+                  const entry =
+                    deepState[
+                      key
+                    ];
+
+                  const run =
+                    () =>
+                      runDeepStream(
+                        key,
+                        (
+                          callbacks
+                        ) =>
+                          streamAnalyzeLink(
+                            url,
+                            callbacks
+                          )
+                      );
+
+                  const clear =
+                    () =>
+                      clearDeep(
+                        key
+                      );
+
+                  const {
+                    host,
+                    rest,
+                  } =
+                    splitUrl(
+                      url
+                    );
+
+                  return (
+                    <div
+                      className="ref-url-card"
+                      key={`${url}-${index}`}
+                    >
+                      <div className="ref-url-card-top">
+                        <div className="ref-url-icon">
+                          <Link2
+                            size={
+                              14
+                            }
+                          />
+                        </div>
+
+                        <div className="ref-url-card-text">
+                          <strong
+                            title={
+                              host
+                            }
+                          >
+                            {
+                              host
+                            }
+                          </strong>
+
+                          {rest && (
+                            <span
+                              title={
+                                rest
+                              }
+                            >
+                              {
+                                rest
+                              }
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="ref-url-card-foot">
-                      <DeepAnalyzeTrigger label={url} entry={entry} onRun={run} onClear={clear} />
-                      {entry && (
-                        <button
-                          type="button"
-                          className="ref-deep-expand-btn"
-                          onClick={() => navigate("/deep-analysis/report", { state: { url, entry } })}
-                          title="Open the full deep analysis report for this link"
-                        >
-                          <Maximize2 size={13} />
-                          Full report
-                        </button>
-                      )}
-                    </div>
+                      <div className="ref-url-card-foot">
+                        <DeepAnalyzeTrigger
+                          label={
+                            url
+                          }
+                          entry={
+                            entry
+                          }
+                          onRun={
+                            run
+                          }
+                          onClear={
+                            clear
+                          }
+                        />
 
-                    <DeepAnalyzePanel entry={entry} onRun={run} onClear={clear} />
-                  </div>
-                );
-              })}
+                        {entry && (
+                          <button
+                            type="button"
+                            className="ref-deep-expand-btn"
+                            onClick={() =>
+                              navigate(
+                                "/deep-analysis/report",
+                                {
+                                  state: {
+                                    type: "url",
+                                    url,
+                                    entry,
+                                  },
+                                }
+                              )
+                            }
+                            title="Open the full deep analysis report for this link"
+                          >
+                            <Maximize2
+                              size={
+                                13
+                              }
+                            />
+
+                            Full report
+                          </button>
+                        )}
+                      </div>
+
+                      <DeepAnalyzePanel
+                        entry={
+                          entry
+                        }
+                        onRun={
+                          run
+                        }
+                        onClear={
+                          clear
+                        }
+                      />
+                    </div>
+                  );
+                }
+              )}
             </div>
 
-            {urlPageCount > 1 && (
+            {urlPageCount >
+              1 && (
               <div className="ref-url-pager">
                 <button
                   type="button"
-                  disabled={urlPageSafe === 1}
-                  onClick={() => setUrlPage((p) => Math.max(1, p - 1))}
+                  disabled={
+                    urlPageSafe ===
+                    1
+                  }
+                  onClick={() =>
+                    setUrlPage(
+                      (
+                        p
+                      ) =>
+                        Math.max(
+                          1,
+                          p - 1
+                        )
+                    )
+                  }
                 >
-                  <ChevronLeft size={14} /> Previous
+                  <ChevronLeft
+                    size={
+                      14
+                    }
+                  />
+
+                  Previous
                 </button>
-                <span>Page {urlPageSafe} of {urlPageCount}</span>
+
+                <span>
+                  Page{" "}
+                  {
+                    urlPageSafe
+                  }{" "}
+                  of{" "}
+                  {
+                    urlPageCount
+                  }
+                </span>
+
                 <button
                   type="button"
-                  disabled={urlPageSafe === urlPageCount}
-                  onClick={() => setUrlPage((p) => Math.min(urlPageCount, p + 1))}
+                  disabled={
+                    urlPageSafe ===
+                    urlPageCount
+                  }
+                  onClick={() =>
+                    setUrlPage(
+                      (
+                        p
+                      ) =>
+                        Math.min(
+                          urlPageCount,
+                          p + 1
+                        )
+                    )
+                  }
                 >
-                  Next <ChevronRight size={14} />
+                  Next
+
+                  <ChevronRight
+                    size={
+                      14
+                    }
+                  />
                 </button>
               </div>
             )}

@@ -13,6 +13,11 @@ from datetime import datetime, timezone
 import whois
 import dns.resolver
 
+try:
+    from . import config
+except ImportError:
+    import config
+
 
 def safe_value(value):
     if value is None:
@@ -148,6 +153,17 @@ def lookup_domain(domain):
     }
 
     try:
+        # The `whois` package opens a raw socket to the registry's WHOIS
+        # server and does NOT set a timeout on it itself -- for domains
+        # with no real/reachable WHOIS server (unregistered domains,
+        # reserved test TLDs like .example, some ccTLDs) the connection
+        # can hang far longer than any of this project's other HTTP
+        # calls. socket.setdefaulttimeout() is the only lever the
+        # library gives us; it's thread-local-unsafe in general, but
+        # this call already runs in its own dedicated worker thread
+        # (see analyzer.py's ThreadPoolExecutor), so it only affects
+        # sockets opened by this lookup.
+        socket.setdefaulttimeout(config.HTTP_TIMEOUT_SECONDS)
         whois_result = whois.whois(domain)
 
         creation_date = whois_result.creation_date
