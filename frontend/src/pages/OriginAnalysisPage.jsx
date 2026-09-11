@@ -268,7 +268,7 @@ export default function OriginAnalysisPage() {
 
                 <div className="ref-origin-field-text">
                   <span>Hostname</span>
-                  <strong>{origin.hostname || "—"}</strong>
+                  <strong>{origin.hostname || origin.reverse || "?"}</strong>
                 </div>
               </div>
 
@@ -279,7 +279,7 @@ export default function OriginAnalysisPage() {
 
                 <div className="ref-origin-field-text">
                   <span>ISP / Organization</span>
-                  <strong>{origin.isp || "—"}</strong>
+                  <strong>{origin.isp || origin.org || "?"}</strong>
                 </div>
               </div>
 
@@ -290,7 +290,7 @@ export default function OriginAnalysisPage() {
 
                 <div className="ref-origin-field-text">
                   <span>ASN</span>
-                  <strong>{origin.asn || "—"}</strong>
+                  <strong>{origin.asn || "?"}</strong>
                 </div>
               </div>
             </div>
@@ -454,7 +454,7 @@ export default function OriginAnalysisPage() {
                               hop.country ? `, ${hop.country}` : ""
                             }`}
                         {" · "}
-                        {hop.asn || "ASN unavailable"}
+                        {hop.isp || hop.org || "ISP unavailable"}{" - "}{hop.asn || "ASN unavailable"}
                       </span>
 
                       {(hop.hostname || delay || signals.length > 0) && (
@@ -467,14 +467,14 @@ export default function OriginAnalysisPage() {
                             marginTop: 7,
                           }}
                         >
-                          {hop.hostname && (
+                          {(hop.hostname || hop.reverse) && (
                             <span
                               style={{
                                 fontSize: 11,
                                 color: "var(--text-muted, #94a3b8)",
                               }}
                             >
-                              {hop.hostname}
+                              {hop.hostname || hop.reverse}
                             </span>
                           )}
 
