@@ -1055,7 +1055,7 @@ def _compose_pdf(case: dict, page_total):
     score = case.get("riskScore", 0)
     severity = case.get("severity", "")
     analyzed_at = case.get("analyzedAt", "")
-    case_hash = case.get("caseHash", "")
+    case_hash = case.get("evidenceSha256") or case.get("caseHash", "")
     previous_hash = case.get("previousHash")
 
     checks = case.get("headerChecks") or {}

@@ -29,11 +29,30 @@ class AiSignals(BaseModel):
 
 class Origin(BaseModel):
     ip: str
+    hostname: Optional[str] = None
     country: Optional[str] = None
     city: Optional[str] = None
+    region: Optional[str] = None
     lat: Optional[float] = None
     lng: Optional[float] = None
+
+    isp: Optional[str] = None
+    org: Optional[str] = None
+    asn: Optional[str] = None
+    reverse: Optional[str] = None
+
+    hosting: Optional[bool] = None
+    proxy: Optional[bool] = None
+    mobile: Optional[bool] = None
+
     isVpnOrHosting: bool = False
+
+    blacklisted: Optional[bool] = None
+    abuse_score: Optional[int] = None
+
+    error: Optional[str] = None
+    message: Optional[str] = None
+    confidence: Optional[dict[str, Any]] = None
 
 
 class RelatedCase(BaseModel):

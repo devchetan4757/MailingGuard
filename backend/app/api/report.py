@@ -9,6 +9,8 @@ Both look up the case in the shared store, build a PDF via
 services/pdf_export.build_case_pdf(), and stream it back.
 """
 
+import hashlib
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 
@@ -45,6 +47,13 @@ def _build_pdf_for_case(case_id: str) -> bytes:
     case = dict(record.get("response") or {})
     case["analyzedAt"] = record.get("analyzedAt", "")
     case["previousHash"] = _previous_hash_for(case_id)
+
+    raw_eml = store.get_raw_eml(case_id)
+    case["evidenceSha256"] = (
+        hashlib.sha256(raw_eml).hexdigest()
+        if raw_eml is not None
+        else ""
+    )
 
     try:
         return build_case_pdf(case)
