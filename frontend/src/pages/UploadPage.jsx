@@ -9,7 +9,7 @@
  */
 
 import { useNavigate } from "react-router-dom";
-import { Sparkles, ArrowRight, LoaderCircle, ShieldCheck, FileSearch } from "lucide-react";
+import { Sparkles, ArrowRight, LoaderCircle, ShieldCheck, FileSearch, Radar } from "lucide-react";
 
 import { useCaseContext } from "../context/CaseContext";
 import { useCases } from "../hooks/useCases";
@@ -105,16 +105,26 @@ export default function UploadPage() {
               <div className="ref-next-content">
                 <div>
                   <strong>Want the full signal breakdown?</strong>
-                  <p>Open Deep Analysis for authentication, origin and AI findings.</p>
+                  <p>Open Deep Analysis for authentication and AI findings, or Origin Analysis for sending IP and server location.</p>
                 </div>
-                <button
-                  type="button"
-                  className="ref-next-cta"
-                  onClick={() => navigate("/analyze")}
-                >
-                  Deep Analysis
-                  <ArrowRight size={15} />
-                </button>
+                <div className="ref-next-cta-row">
+                  <button
+                    type="button"
+                    className="ref-next-cta"
+                    onClick={() => navigate("/analyze")}
+                  >
+                    Deep Analysis
+                    <ArrowRight size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    className="ref-next-cta ref-next-cta--secondary"
+                    onClick={() => navigate("/origin")}
+                  >
+                    <Radar size={13} />
+                    Origin Analysis
+                  </button>
+                </div>
               </div>
             </DashboardPanel>
           </div>
@@ -124,7 +134,7 @@ export default function UploadPage() {
             PARSING OUTPUT + CHARTS FOR THIS EMAIL
             ================================================= */}
 
-        <EmailParsingPanel currentCase={currentCase} />
+        <EmailParsingPanel currentCase={currentCase} deepAnalyzeMode="redirect" />
 
         {!currentCase && (
           <p className="ref-history-note">

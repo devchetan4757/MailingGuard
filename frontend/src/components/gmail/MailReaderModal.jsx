@@ -15,7 +15,6 @@ import {
   FileText,
   Loader2,
   Paperclip,
-  Radar,
   Sparkles,
   X,
 } from "lucide-react";
@@ -177,18 +176,10 @@ export default function MailReaderModal({
                   <button
                     type="button"
                     className="gmail-reader-footer-btn gmail-reader-footer-btn--analyze"
-                    onClick={() => onHandoff("analyze")}
+                    onClick={() => onHandoff()}
                   >
                     <Sparkles size={13} />
-                    AI Deep Analysis
-                  </button>
-                  <button
-                    type="button"
-                    className="gmail-reader-footer-btn"
-                    onClick={() => onHandoff("origin")}
-                  >
-                    <Radar size={13} />
-                    Origin Analysis
+                    Analyze
                   </button>
                 </div>
               </footer>

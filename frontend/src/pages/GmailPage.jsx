@@ -210,26 +210,25 @@ export default function GmailPage() {
   }
 
   // Hand a single loaded message over to the analysis pipeline, then
-  // jump straight to whichever surface the user picked — the AI Deep
-  // Analysis page and the Origin Analysis page both just read the
-  // same `currentCase`, so one analyze call feeds either.
-  async function handleHandoff(messageId, targetId) {
+  // jump straight to the parsing page — from there the user can choose
+  // to go on to AI Deep Analysis or Origin Analysis themselves.
+  async function handleHandoff(messageId) {
     const result = await analyzeMessage(messageId).catch(() => null);
 
     if (!result) return;
 
     setCurrentCase(result);
     refetchCases();
-    navigate(targetId === "origin" ? "/origin" : "/analyze");
+    navigate("/upload");
   }
 
-  // Reached from the reader modal's own "AI Deep Analysis" /
-  // "Origin Analysis" buttons — close the reader first so it isn't
-  // left open underneath the page we navigate to.
-  function handleHandoffFromReader(targetId) {
+  // Reached from the reader modal's own "Analyze" button — close the
+  // reader first so it isn't left open underneath the page we
+  // navigate to.
+  function handleHandoffFromReader() {
     const messageId = readerMailId;
     handleCloseReader();
-    if (messageId) handleHandoff(messageId, targetId);
+    if (messageId) handleHandoff(messageId);
   }
 
   // Google redirects the browser straight back here after OAuth
@@ -773,9 +772,7 @@ export default function GmailPage() {
 
                             <MailHandoffMenu
                               isBusy={handoffPendingId === message.id}
-                              onSelect={(targetId) =>
-                                handleHandoff(message.id, targetId)
-                              }
+                              onSelect={() => handleHandoff(message.id)}
                             />
                           </div>
                         </div>

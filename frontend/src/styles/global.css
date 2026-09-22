@@ -2363,6 +2363,23 @@ svg {
   transform: translateY(-1px);
 }
 
+.ref-next-cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ref-next-cta--secondary {
+  border-color: #e3c79a;
+  background: #fdf6ec;
+  color: #a5762f;
+}
+
+.ref-next-cta--secondary:hover {
+  background: #faecd6;
+  border-color: #d6ac68;
+}
+
 .ref-check-status.is-unknown {
   color: #7f8b90;
 }

@@ -13,32 +13,39 @@ import {
   MapPin,
   Globe2,
   AlertTriangle,
-  CheckCircle2,
-  XCircle,
   ArrowRight,
   FileDown,
   Sparkles,
+  Link2,
+  Paperclip,
+  Search,
 } from "lucide-react";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+} from "recharts";
 
 import { useCaseContext } from "../context/CaseContext";
-import { DashboardPanel, RiskGauge } from "../components/dashboard/DashboardWidgets";
+import { DashboardPanel, DashboardStat, RiskGauge } from "../components/dashboard/DashboardWidgets";
 import AiBadge from "../components/dashboard/AiBadge";
 import EmailParsingPanel from "../components/dashboard/EmailParsingPanel";
 
-const CHECK_META = {
-  spf: {
-    label: "SPF",
-    desc: "Confirms the sending server was allowed to send on this domain's behalf.",
-  },
-  dkim: {
-    label: "DKIM",
-    desc: "Confirms the message wasn't altered in transit.",
-  },
-  dmarc: {
-    label: "DMARC",
-    desc: "Confirms the domain publishes a policy for handling failed checks.",
-  },
-};
+// Extensions the backend can actually run a deep scan against (mirrors
+// backend/app/api/deep_analysis.py's ALLOWED_PDF_EXTENSIONS /
+// ALLOWED_IMAGE_EXTENSIONS) — used here purely to show how much of what
+// came in on this email is eligible for a deep scan.
+const SCANNABLE_EXTENSIONS = new Set([
+  ".pdf", ".jpg", ".jpeg", ".png", ".gif", ".tif", ".tiff", ".bmp", ".webp", ".heic",
+]);
+
+function attachmentExtension(item) {
+  if (item.extension) return item.extension.toLowerCase();
+  const name = item.filename || "";
+  const dot = name.lastIndexOf(".");
+  return dot === -1 ? "" : name.slice(dot).toLowerCase();
+}
 
 const VERDICT_COPY = {
   red: "High-confidence phishing indicators were found. Treat this email as malicious — don't click links, open attachments, or reply.",
@@ -80,6 +87,65 @@ function buildSignals(currentCase) {
   return signals;
 }
 
+// Everything this email surfaced that a deep scan can actually be run
+// against — links, and attachments whose type the PDF/image analyzers
+// support — shown as one small "what can we dig into" visual instead of
+// a bare list, so the AI Deep Analysis page opens with something worth
+// looking at even before any individual scan has been run.
+function buildScanCoverage(currentCase) {
+  const analysis = currentCase.analysis || {};
+  const urls = analysis.urls || [];
+  const attachments = analysis.attachments || [];
+
+  const scannableAttachments = attachments.filter((a) => SCANNABLE_EXTENSIONS.has(attachmentExtension(a)));
+  const otherAttachments = attachments.length - scannableAttachments.length;
+  const suspiciousAttachments = attachments.filter((a) => a.suspicious).length;
+  const headerFindings = (analysis.header_findings || []).length;
+
+  const data = [
+    { name: "Links", value: urls.length, color: "#5b8dee" },
+    { name: "Scannable attachments", value: scannableAttachments.length, color: "#56a98a" },
+    { name: "Other attachments", value: otherAttachments, color: "#cbd5d8" },
+  ].filter((item) => item.value > 0);
+
+  const total = urls.length + attachments.length;
+
+  return { data, total, urlCount: urls.length, attachmentCount: attachments.length, scannableCount: scannableAttachments.length, suspiciousAttachments, headerFindings };
+}
+
+function ScanCoverageDonut({ data, total }) {
+  if (!total) {
+    return <p className="ref-empty-inline">No links or attachments were extracted from this email.</p>;
+  }
+
+  return (
+    <div className="ref-report-donut">
+      <div className="ref-report-donut-chart">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie data={data} dataKey="value" nameKey="name" innerRadius="68%" outerRadius="94%" paddingAngle={3} stroke="none">
+              {data.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="ref-report-donut-center">
+          <strong>{total}</strong>
+          <span>deep-scannable</span>
+        </div>
+      </div>
+      <div className="ref-report-donut-legend">
+        {data.map((item) => (
+          <div className="ref-report-donut-legend-row" key={item.name}>
+            <i style={{ background: item.color }} />
+            <span>{item.name}</span>
+            <b>{item.value}</b>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function AnalysisPage() {
   const navigate = useNavigate();
   const { currentCase } = useCaseContext();
@@ -99,7 +165,7 @@ export default function AnalysisPage() {
             <h3>No email analyzed yet</h3>
             <p>
               Upload an email on the Upload &amp; Parse page to get a full AI
-              breakdown here — authentication checks, origin trace, and every
+              breakdown here — origin trace, deep-scannable content, and every
               signal we found.
             </p>
             <button type="button" className="ref-empty-cta" onClick={() => navigate("/upload")}>
@@ -113,9 +179,12 @@ export default function AnalysisPage() {
   }
 
   const signals = buildSignals(currentCase);
-  const hc = currentCase.headerChecks || {};
   const origin = currentCase.origin || {};
-  const checkKeys = ["spf", "dkim", "dmarc"];
+  const coverage = buildScanCoverage(currentCase);
+
+  const highCount = signals.filter((s) => s.level === "high").length;
+  const mediumCount = signals.filter((s) => s.level === "medium").length;
+  const lowCount = signals.filter((s) => s.level === "low").length;
 
   return (
     <main className="reference-dashboard">
@@ -148,32 +217,16 @@ export default function AnalysisPage() {
         </section>
 
         <div className="ref-grid-two">
-          <DashboardPanel title="Authentication checks">
-            <div className="ref-checklist">
-              {checkKeys.map((key) => {
-                const rawValue = hc[key];
-                const value = rawValue === "pass" || rawValue === "fail" ? rawValue : "unknown";
-                const failed = value === "fail";
-                const passed = value === "pass";
-
-                return (
-                  <div className="ref-check-row" key={key}>
-                    <div className={`ref-check-status ${failed ? "is-fail" : passed ? "is-pass" : "is-unknown"}`}>
-                      {failed ? <XCircle size={16} /> : passed ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
-                      {CHECK_META[key].label}
-                      <span>{value === "unknown" ? "not checked" : value}</span>
-                    </div>
-                    <p>{CHECK_META[key].desc}</p>
-                  </div>
-                );
-              })}
-
-              {hc.senderDomainMismatch && (
-                <div className="ref-check-flag">
-                  <AlertTriangle size={14} />
-                  Sender display name doesn't match the reply-to domain.
-                </div>
-              )}
+          <DashboardPanel
+            title="Deep-scannable content"
+            right={<span className="ref-panel-number">{coverage.total}</span>}
+          >
+            <ScanCoverageDonut data={coverage.data} total={coverage.total} />
+            <div className="ref-parse-stats ref-scan-coverage-stats">
+              <DashboardStat icon={Link2} label="Links found" value={coverage.urlCount} />
+              <DashboardStat icon={Paperclip} label="Attachments" value={coverage.attachmentCount} />
+              <DashboardStat icon={Search} label="Scannable" value={coverage.scannableCount} />
+              <DashboardStat icon={AlertTriangle} label="Flagged" value={coverage.suspiciousAttachments} />
             </div>
           </DashboardPanel>
 
@@ -198,14 +251,26 @@ export default function AnalysisPage() {
           </DashboardPanel>
         </div>
 
-        <EmailParsingPanel currentCase={currentCase} />
+        <EmailParsingPanel currentCase={currentCase} variant="minimal" />
 
-        <DashboardPanel title="AI signals" right={<AiBadge label={`${signals.length} found`} />}>
+        <DashboardPanel
+          title="AI signals"
+          right={<AiBadge label={`${signals.length} found`} />}
+        >
+          <div className="ref-signal-summary">
+            <span className="ref-signal-count is-high"><b>{highCount}</b> high</span>
+            <span className="ref-signal-count is-medium"><b>{mediumCount}</b> medium</span>
+            <span className="ref-signal-count is-low"><b>{lowCount}</b> low</span>
+          </div>
+
           <ul className="ref-signal-list">
             {signals.map((signal, index) => (
               <li key={index} className={`ref-signal-item level-${signal.level}`}>
-                {signal.level === "low" ? <ShieldCheck size={15} /> : <ShieldAlert size={15} />}
-                <span>{signal.text}</span>
+                <span className="ref-signal-icon">
+                  {signal.level === "low" ? <ShieldCheck size={15} /> : <ShieldAlert size={15} />}
+                </span>
+                <span className="ref-signal-text">{signal.text}</span>
+                <span className={`ref-signal-badge level-${signal.level}`}>{signal.level}</span>
               </li>
             ))}
           </ul>

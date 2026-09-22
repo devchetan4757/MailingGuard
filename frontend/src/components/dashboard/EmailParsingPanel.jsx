@@ -18,7 +18,8 @@ import {
   UserRound,
   ChevronLeft,
   ChevronRight,
-  Maximize2,
+  BrainCircuit,
+  ArrowRight,
 } from "lucide-react";
 
 import {
@@ -39,25 +40,16 @@ import {
   DashboardStat,
 } from "./DashboardWidgets";
 
-import {
-  DeepAnalyzeTrigger,
-  DeepAnalyzePanel,
-} from "../results/DeepAnalysisResult";
-
 import { useDeepAnalysis } from "../../hooks/useDeepAnalysis";
-
-import {
-  streamAnalyzeLink,
-  analyzeCaseAttachment,
-} from "../../api/deepAnalysisApi";
 
 const AUTH_KEYS = ["spf", "dkim", "dmarc"];
 
 // Mirrors backend/app/api/deep_analysis.py's
 // ALLOWED_PDF_EXTENSIONS / ALLOWED_IMAGE_EXTENSIONS.
-const DEEP_SCANNABLE_EXTENSIONS =
+const PDF_EXTENSIONS = new Set([".pdf"]);
+
+const IMAGE_EXTENSIONS =
   new Set([
-    ".pdf",
     ".jpg",
     ".jpeg",
     ".png",
@@ -67,6 +59,12 @@ const DEEP_SCANNABLE_EXTENSIONS =
     ".bmp",
     ".webp",
     ".heic",
+  ]);
+
+const DEEP_SCANNABLE_EXTENSIONS =
+  new Set([
+    ...PDF_EXTENSIONS,
+    ...IMAGE_EXTENSIONS,
   ]);
 
 function attachmentExtension(item) {
@@ -511,6 +509,26 @@ function MetadataGrid({
   );
 }
 
+// Used on the parsing page (Upload & Parse) instead of DeepAnalyzeTrigger.
+// Parsing is just for looking at what was extracted -- actually running a
+// deep scan (and seeing/streaming its results) only happens on the AI Deep
+// Analysis page now, so this just routes the user over there rather than
+// kicking off analysis inline.
+function DeepAnalyzeRedirectButton({ label, navigate }) {
+  return (
+    <button
+      type="button"
+      className="ref-deep-btn"
+      onClick={() => navigate("/analyze")}
+      title={`Deep analyze ${label} on the AI Deep Analysis page`}
+    >
+      <BrainCircuit size={13} />
+      Deep Analysis
+      <ArrowRight size={12} />
+    </button>
+  );
+}
+
 function EmptyBlock({
   text,
 }) {
@@ -523,17 +541,27 @@ function EmptyBlock({
 
 export default function EmailParsingPanel({
   currentCase,
+  // "full" (default, Upload & Parse page): overview/telemetry/metadata +
+  // attachments + links.
+  // "minimal" (AI Deep Analysis page): skip the overview/telemetry/
+  // metadata/threat-indicator panels, since those are already shown in
+  // full on the Upload & Parse page -- only the attachments/links panels
+  // (where an actual deep scan can be run) are shown here.
+  variant = "full",
+  // "run" (default, AI Deep Analysis page): the Deep analyze buttons on
+  // attachments/links run the scan inline right here.
+  // "redirect" (Upload & Parse page): those buttons just send the user to
+  // the AI Deep Analysis page instead of kicking off a scan on the parsing
+  // page.
+  deepAnalyzeMode = "run",
 }) {
   const navigate =
     useNavigate();
 
-  const {
-    state: deepState,
-    run: runDeep,
-    runStream:
-      runDeepStream,
-    clear: clearDeep,
-  } = useDeepAnalysis();
+  const showParsingSections = variant !== "minimal";
+  const isRedirectMode = deepAnalyzeMode === "redirect";
+
+  const { state: deepState } = useDeepAnalysis();
 
   const [
     urlPage,
@@ -674,6 +702,7 @@ export default function EmailParsingPanel({
 
   return (
     <div className="ref-email-analysis-stack">
+      {showParsingSections && (
       <DashboardPanel
         title="Email analysis overview"
         right={
@@ -769,13 +798,17 @@ export default function EmailParsingPanel({
           />
         </div>
       </DashboardPanel>
+      )}
 
+      {showParsingSections && (
       <DashboardPanel title="Parser telemetry">
         <ContentRiskChart
           data={contentRisk}
         />
       </DashboardPanel>
+      )}
 
+      {showParsingSections && (
       <DashboardPanel
         title="Email metadata"
         right={
@@ -791,8 +824,10 @@ export default function EmailParsingPanel({
           metadata={metadata}
         />
       </DashboardPanel>
+      )}
 
-      <div className="ref-grid-two">
+      <div className={showParsingSections ? "ref-grid-two" : ""}>
+        {showParsingSections && (
         <DashboardPanel
           title="Threat indicators"
           right={
@@ -869,6 +904,7 @@ export default function EmailParsingPanel({
             )}
           </div>
         </DashboardPanel>
+        )}
 
         <DashboardPanel
           title="Detected attachments"
@@ -892,34 +928,32 @@ export default function EmailParsingPanel({
                 ) => {
                   const key = `attachment-${index}`;
 
+                  const extension =
+                    attachmentExtension(
+                      item
+                    );
+
                   const scannable =
                     DEEP_SCANNABLE_EXTENSIONS.has(
-                      attachmentExtension(
-                        item
-                      )
+                      extension
                     );
+
+                  // Each attachment type gets routed to its own report
+                  // type on the full-report page — PDFs get the real
+                  // PDF analyzer report, images get their own (lighter,
+                  // not-yet-fully-built) report surface, rather than
+                  // every attachment being force-fit into the PDF view.
+                  const attachmentReportType =
+                    IMAGE_EXTENSIONS.has(
+                      extension
+                    )
+                      ? "image"
+                      : "pdf";
 
                   const entry =
                     deepState[
                       key
                     ];
-
-                  const run =
-                    () =>
-                      runDeep(
-                        key,
-                        () =>
-                          analyzeCaseAttachment(
-                            currentCase.caseId,
-                            index
-                          )
-                      );
-
-                  const clear =
-                    () =>
-                      clearDeep(
-                        key
-                      );
 
                   /*
                    * IMPORTANT:
@@ -937,7 +971,7 @@ export default function EmailParsingPanel({
                         "/deep-analysis/report",
                         {
                           state: {
-                            type: "pdf",
+                            type: attachmentReportType,
 
                             caseId:
                               currentCase.caseId,
@@ -997,58 +1031,39 @@ export default function EmailParsingPanel({
                           </b>
                         )}
 
-                        {scannable && (
-                          <DeepAnalyzeTrigger
+                        {scannable && isRedirectMode && (
+                          <DeepAnalyzeRedirectButton
                             label={
                               item.filename ||
                               "attachment"
                             }
-                            entry={
-                              entry
-                            }
-                            onRun={
-                              run
-                            }
-                            onClear={
-                              clear
+                            navigate={
+                              navigate
                             }
                           />
                         )}
 
-                        {scannable &&
-                          entry && (
-                            <button
-                              type="button"
-                              className="ref-deep-expand-btn"
-                              onClick={
-                                openFullReport
+                        {scannable && !isRedirectMode && (
+                          <button
+                            type="button"
+                            className="ref-deep-btn"
+                            onClick={
+                              openFullReport
+                            }
+                            title={`Open the full deep analysis report for ${
+                              item.filename ||
+                              "this attachment"
+                            }`}
+                          >
+                            <BrainCircuit
+                              size={
+                                13
                               }
-                              title="Open the full deep analysis report for this attachment"
-                            >
-                              <Maximize2
-                                size={
-                                  13
-                                }
-                              />
-
-                              Full report
-                            </button>
-                          )}
+                            />
+                            Deep Analysis
+                          </button>
+                        )}
                       </div>
-
-                      {scannable && (
-                        <DeepAnalyzePanel
-                          entry={
-                            entry
-                          }
-                          onRun={
-                            run
-                          }
-                          onClear={
-                            clear
-                          }
-                        />
-                      )}
                     </div>
                   );
                 }
@@ -1089,25 +1104,6 @@ export default function EmailParsingPanel({
                     deepState[
                       key
                     ];
-
-                  const run =
-                    () =>
-                      runDeepStream(
-                        key,
-                        (
-                          callbacks
-                        ) =>
-                          streamAnalyzeLink(
-                            url,
-                            callbacks
-                          )
-                      );
-
-                  const clear =
-                    () =>
-                      clearDeep(
-                        key
-                      );
 
                   const {
                     host,
@@ -1157,25 +1153,15 @@ export default function EmailParsingPanel({
                       </div>
 
                       <div className="ref-url-card-foot">
-                        <DeepAnalyzeTrigger
-                          label={
-                            url
-                          }
-                          entry={
-                            entry
-                          }
-                          onRun={
-                            run
-                          }
-                          onClear={
-                            clear
-                          }
-                        />
-
-                        {entry && (
+                        {isRedirectMode ? (
+                          <DeepAnalyzeRedirectButton
+                            label={url}
+                            navigate={navigate}
+                          />
+                        ) : (
                           <button
                             type="button"
-                            className="ref-deep-expand-btn"
+                            className="ref-deep-btn"
                             onClick={() =>
                               navigate(
                                 "/deep-analysis/report",
@@ -1190,28 +1176,15 @@ export default function EmailParsingPanel({
                             }
                             title="Open the full deep analysis report for this link"
                           >
-                            <Maximize2
+                            <BrainCircuit
                               size={
                                 13
                               }
                             />
-
-                            Full report
+                            Deep Analysis
                           </button>
                         )}
                       </div>
-
-                      <DeepAnalyzePanel
-                        entry={
-                          entry
-                        }
-                        onRun={
-                          run
-                        }
-                        onClear={
-                          clear
-                        }
-                      />
                     </div>
                   );
                 }

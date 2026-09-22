@@ -698,7 +698,8 @@ export default function DeepAnalysisReportPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const initial = location.state || null;
-  const isPdf = initial?.type === "pdf" || initial?.attachment?.name?.toLowerCase?.().endsWith(".pdf");
+  const isImage = initial?.type === "image";
+  const isPdf = !isImage && (initial?.type === "pdf" || initial?.attachment?.name?.toLowerCase?.().endsWith(".pdf"));
   const [url] = useState(initial?.url || "");
   const [entry, setEntry] = useState(initial?.entry || null);
   const closeStream = useRef(null);
@@ -766,6 +767,34 @@ export default function DeepAnalysisReportPage() {
     if (!isPdf) return url;
     return entry?.result?.file?.name || initial?.attachment?.name || "PDF attachment";
   }, [isPdf, url, entry?.result?.file?.name, initial?.attachment?.name]);
+
+  if (isImage) {
+    return (
+      <main className="reference-dashboard">
+        <div className="reference-shell">
+          <header className="reference-page-head ref-report-head">
+            <div className="ref-report-head-left">
+              <button type="button" className="ref-report-back" onClick={() => navigate(-1)} title="Back"><ArrowLeft size={18} /></button>
+              <div>
+                <h1 className="ref-report-title">Deep <span>Analysis Report</span></h1>
+                <div className="ref-report-target">
+                  <ImageIcon size={13} />
+                  <span title={initial?.attachment?.filename}>{initial?.attachment?.filename || "Image attachment"}</span>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <section className="ref-panel ref-analysis-empty">
+            <ImageIcon size={30} strokeWidth={1.6} />
+            <h3>Image analysis is coming soon</h3>
+            <p>A dedicated deep analysis report for image attachments isn't available yet — link and PDF reports are ready to use in the meantime.</p>
+            <button type="button" className="ref-empty-cta" onClick={() => navigate(-1)}>Back to parsing results</button>
+          </section>
+        </div>
+      </main>
+    );
+  }
 
   if (!isPdf && !url) {
     return (
