@@ -1,0 +1,18 @@
+﻿<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MailingGuard</title><link rel="stylesheet" href="popup.css"></head>
+<body>
+  <main class="panel" aria-labelledby="title">
+    <header class="brand"><img src="icons/icon32.png" alt=""><div><h1 id="title">MailingGuard</h1><p>Inbox protection foundation</p></div></header>
+    <section class="card" aria-labelledby="protection-heading">
+      <div class="row"><div><h2 id="protection-heading">Protection</h2><p id="protection-help">Protection is active.</p></div><button id="protection-toggle" class="switch" type="button" role="switch" aria-checked="true" aria-describedby="protection-help"><span class="switch-thumb"></span><span class="switch-label">ON</span></button></div>
+    </section>
+    <section class="status" aria-live="polite"><span id="status-dot" class="dot"></span><div><h2>Status</h2><p id="status-text">Loading...</p></div></section>
+    <p id="error" class="error" role="alert" hidden></p>
+    <button id="settings-link" class="link-button" type="button">Open Settings <span aria-hidden="true">-></span></button>
+  </main>
+  <script src="shared/constants.js"></script><script src="shared/risk.js"></script><script src="shared/utils.js"></script><script src="background/storage.js"></script><script src="popup.js"></script>
+</body>
+</html>
+
+
