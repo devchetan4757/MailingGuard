@@ -1,0 +1,1 @@
+MailingGuard extension icons. PNG assets are supplied at the sizes referenced by manifest.json.

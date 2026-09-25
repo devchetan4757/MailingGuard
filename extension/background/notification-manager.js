@@ -1,10 +1,10 @@
-﻿// Notification boundary for future analysis results. It never renders authentication details.
+// Notification boundary for future analysis results. It never renders authentication details.
 (function () {
   function createSuspiciousEmailNotification(input = {}) {
     const title = safeText(input.title, 'Suspicious email detected');
     const severity = normalizeSeverity(input.severity);
     const riskScore = Number.isFinite(Number(input.riskScore)) ? Math.round(Number(input.riskScore)) : null;
-    const summary = riskScore === null ? severityLabel(severity) + " - review when ready" : severityLabel(severity) + " - risk score " + riskScore;
+    const summary = riskScore === null ? `${severityLabel(severity)} — review when ready` : `${severityLabel(severity)} — risk score ${riskScore}`;
     const options = {
       type: 'basic',
       iconUrl: chrome.runtime.getURL('icons/icon128.png'),
@@ -24,5 +24,3 @@
 
   self.MGNotifications = Object.freeze({ createSuspiciousEmailNotification });
 })();
-
-

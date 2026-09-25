@@ -1,4 +1,97 @@
-﻿<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MailingGuard Settings</title><link rel="stylesheet" href="options.css"></head><body><main class="settings" aria-labelledby="title"><header><img src="icons/icon48.png" alt=""><div><h1 id="title">MailingGuard Settings</h1><p>Configure the extension foundation.</p></div></header><section class="settings-card"><div class="setting-row"><div><h2>Protection</h2><p>Enable MailingGuard protection.</p></div><button id="protection-toggle" class="switch" type="button" role="switch" aria-checked="true"><span class="switch-thumb"></span><span class="switch-label">ON</span></button></div><div class="setting-row"><div><h2>Notifications</h2><p>Allow future suspicious-email alerts.</p></div><button id="notifications-toggle" class="switch" type="button" role="switch" aria-checked="true"><span class="switch-thumb"></span><span class="switch-label">ON</span></button></div><div class="setting-row"><div><label for="threshold"><h2>Alert threshold</h2><p>Alert at or above this risk level.</p></label></div><select id="threshold"><option value="high">High Risk</option></select></div></section><p id="save-state" class="save-state" aria-live="polite">Loading settings...</p><p id="error" class="error" role="alert" hidden></p></main><script src="shared/constants.js"></script><script src="shared/risk.js"></script><script src="shared/utils.js"></script><script src="background/storage.js"></script><script src="options.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>MailingGuard Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <main class="settings" aria-labelledby="title">
+    <header>
+      <img src="icons/icon48.png" alt="">
+      <div>
+        <h1 id="title">MailingGuard Settings</h1>
+        <p>Configure the extension foundation.</p>
+      </div>
+    </header>
 
+    <section class="settings-card">
+      <div class="setting-row">
+        <div>
+          <h2>Protection</h2>
+          <p>Enable MailingGuard protection.</p>
+        </div>
 
+        <button
+          id="protection-toggle"
+          class="switch"
+          type="button"
+          role="switch"
+          aria-checked="true"
+        >
+          <span class="switch-thumb"></span>
+          <span class="switch-label">ON</span>
+        </button>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <h2>Notifications</h2>
+          <p>Allow future suspicious-email alerts.</p>
+        </div>
+
+        <button
+          id="notifications-toggle"
+          class="switch"
+          type="button"
+          role="switch"
+          aria-checked="true"
+        >
+          <span class="switch-thumb"></span>
+          <span class="switch-label">ON</span>
+        </button>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <label for="threshold">
+            <h2>Alert threshold</h2>
+            <p>Alert at or above this risk level.</p>
+          </label>
+        </div>
+
+        <select id="threshold">
+          <option value="high">High Risk</option>
+        </select>
+      </div>
+    </section>
+
+    <section class="settings-card account-card">
+      <h2>Gmail Account</h2>
+      <p id="gmail-status" aria-live="polite">Not connected</p>
+      <p id="gmail-email" class="email" hidden></p>
+
+      <button
+        id="gmail-action"
+        class="primary-button"
+        type="button"
+      >
+        Connect Gmail
+      </button>
+    </section>
+
+    <p id="save-state" class="save-state" aria-live="polite">
+      Loading settings…
+    </p>
+
+    <p id="error" class="error" role="alert" hidden></p>
+  </main>
+
+  <script src="shared/constants.js"></script>
+  <script src="shared/risk.js"></script>
+  <script src="shared/utils.js"></script>
+  <script src="background/storage.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

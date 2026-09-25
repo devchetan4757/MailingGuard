@@ -19,6 +19,7 @@ from app.api.report import router as report_router
 from app.api.origin import router as origin_router
 from app.api.integrations.gmail import router as gmail_router
 from app.api.deep_analysis import router as deep_analysis_router
+from app.api.extension import register_extension_routes
 
 
 # ---------------------------------------------------------------------------
@@ -50,6 +51,8 @@ app.add_middleware(
     ],
 
     allow_credentials=True,
+
+    allow_origin_regex=r"^chrome-extension://[a-p]{32}$",
 
     allow_methods=[
         "*",
@@ -168,3 +171,10 @@ async def api_health():
         "service": "mailguard",
         "analyzer": "enabled",
     }
+
+# ---------------------------------------------------------------------------
+# BROWSER EXTENSION AUTHENTICATION
+# ---------------------------------------------------------------------------
+
+# Registers POST /api/extension/auth without changing existing API routes.
+register_extension_routes(app)
